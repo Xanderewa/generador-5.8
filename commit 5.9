@@ -1,0 +1,4500 @@
+// ==UserScript==
+
+// @name         Po-v5.9-Final PRO
+
+// @description  v5.9 PRO · Modular Architecture + Advanced Indicators + ML + Backtesting
+
+// @author       xander
+
+// @match        https://pocketoption.com/*
+
+// @match        https://*.pocketoption.com/*
+
+// @match        https://*.po.trade/*
+
+// @match        https://*.po.market/*
+
+// @match        https://*.pocketoption.org/*
+
+// @run-at       document-start
+
+// @grant        GM_xmlhttpRequest
+
+// @grant        unsafeWindow
+
+// @connect      api.telegram.org
+
+// ==/UserScript==
+
+(function () {
+
+    'use strict';
+
+    const win = typeof unsafeWindow !== 'undefined' ? unsafeWindow : window;
+
+    // ==================== CORE BOT STATE ====================
+
+    const STORAGE_KEY = 'po_vip_panel_v59_pro';
+
+    const PAIR_STATE_KEY = 'po_vip_pair_states';
+
+    // Centralized Bot State
+
+    const BotState = {
+
+        config: {
+
+            TELEGRAM_TOKEN: '8822818498:AAFmuBxNyRogaXYgT3MnOTVCTj8dwKfqgmw',
+
+            TELEGRAM_CHAT_ID: '-1004476929607',
+
+            EXPIRY_TIME_SEC: 60,
+
+            COOLDOWN_MINUTES_PER_PAIR: 2,
+
+            MAX_SIGNALS_SESSION: 300,
+
+            EVAL_SEC_START: 20,
+
+            EVAL_SEC_END: 50,
+
+            EVAL_BUCKETS: [20, 30, 40, 45, 50],
+
+            SUMMARY_EVERY_N: 20,
+
+            NOTIFY_FIRST_TICK: false,
+
+            NOTIFY_PAIR_OPEN: true,
+
+            MARTINGALE_ENABLED: true,
+
+            MARTINGALE_STEPS: 1,
+
+            DISPLAY_UTC_OFFSET_MIN: -60,
+
+            OPERATION_MODE: 'normal',
+
+            AUTOTRADE_ENABLED: false,
+
+            MULTI_PAR_ENABLED: false,
+
+            MIN_PAYOUT: 80,
+
+            MIN_CONFLUENCE_SCORE: 1,
+
+            MAX_SIGNALS_PER_HOUR: 100,
+
+            MAX_SIGNALS_PER_PAIR_HOUR: 10,
+
+            SWING_LOOKBACK: 15,
+
+            MA_PERIOD: 10,
+
+            MA_SLOPE_LOOKBACK: 3,
+
+            RSI_PERIOD: 14,
+
+            PULLBACK_LEVEL: 'weak',
+
+            PULLBACK_FIB_MODE: 'classic',
+
+            PULLBACK_RSI_CALL_MAX: 58,
+
+            PULLBACK_RSI_CALL_MIN: 0,
+
+            PULLBACK_RSI_PUT_MIN: 42,
+
+            PULLBACK_RSI_PUT_MAX: 100,
+
+            PULLBACK_FIB_LOW: 0.50,
+
+            PULLBACK_FIB_HIGH: 0.50,
+
+            PULLBACK_REJECT_WICK: 0.0003,
+
+            PULLBACK_CONFLUENCE_MIN: 1,
+
+            PULLBACK_IMPULSE_BARS: 0,
+
+            PULLBACK_REQUIRE_CANDLE_DIR: false,
+
+            PULLBACK_COOLDOWN_MIN: 2,
+
+            ALLIGATOR_MIN_S15: 18,
+
+            ALLIGATOR_SCORE_BONUS: 1,
+
+            ALLIGATOR_DM_CALL: 60,
+
+            ALLIGATOR_DM_PUT: 40,
+
+            ENGULF_LEVEL: 'normal',
+
+            PA_ENGULF_BODY_MULT: 1.10,
+
+            PA_ENGULF_MIN_BODY: 0.35,
+
+            PA_ENGULF_PREV_BODY_MIN: 0.18,
+
+            PA_ENGULF_RANGE_ATR_MULT: 0.85,
+
+            PA_ENGULF_CONFLUENCE_MIN: 1,
+
+            PA_ENGULF_REQUIRE_TREND: false,
+
+            PA_ENGULF_CLOSE_EXTREME: 0.55,
+
+            PA_ENGULF_SCORE_BONUS: 1,
+
+            ENABLE_BOLLINGER: true,
+
+            ENABLE_PINBAR: true,
+
+            ENABLE_INSIDE_BAR: true,
+
+            ENABLE_ALLIGATOR: true,
+
+            ENABLE_GAP_FILL: true,
+
+            ENABLE_PULLBACK: true,
+
+            ENABLE_ENGULFING: true,
+
+            ENABLE_GAP: true,
+
+            ENABLE_TRAP_WICK: true,
+
+            ENABLE_FALSE_BREAK: true,
+
+            ENABLE_STOCH_PULL: false,
+
+            STOCH_PERIOD: 5,
+
+            STOCH_K: 3,
+
+            STOCH_D: 3,
+
+            BB_PERIOD: 20,
+
+            BB_STD: 1.7,
+
+            EMA_FAST: 5,
+
+            EMA_SLOW: 20,
+
+            PA_GAP_MIN_PCT: 0.00005,
+
+            PA_PIN_TRAP_WICK: 0.45,
+
+            PA_MIN_BODY: 0.22,
+
+            BO_LOOKBACK: 7,
+
+            CHAOS_MULT: 3.0,
+
+            DEAD_RATIO: 0.35,
+
+            CHOP_LOOKBACK: 6,
+
+            CONFLUENCE_MIN: 1,
+
+            SR_PROXIMITY: 0.40,
+
+            MIN_TICKS_PER_CANDLE: 5,
+
+            MIN_PRICE_FILTER: 0.01,
+
+            RSI_DEAD_ZONE: 5,
+
+            SCORE_PENALTY_LOW_PAYOUT: 1,
+
+            MIN_PAYOUT_FOR_MARTINGALE: 85,
+
+            MOTOR_CONFIDENCE_WINDOW: 20,
+
+            MOTOR_MIN_WINRATE: 0.0,
+
+            DEAD_ZONE_PCT: 0.0002,
+
+            DEAD_ZONE_MINUTES: 3,
+
+            DEAD_ZONE_PAUSE_MINUTES: 5,
+
+            PAIR_DIVERSITY_WINDOW: 15,
+
+            PAIR_MAX_SHARE: 0.40,
+
+            AUTO_KILL_ENABLED: true,
+
+            AUTO_KILL_MIN_WR: 0.45,
+
+            AUTO_KILL_WINDOW: 10,
+
+            REPETITION_PAUSE_LIMIT: 2,
+
+            REPETITION_PAUSE_MINUTES: 5,
+
+            BOT_RUNNING: true,
+
+            TELEGRAM_ENABLED: true,
+
+            LOG_MAX_LINES: 80,
+
+            BACKTEST_MODE: false,
+
+            POSITION_SIZE_PERCENTAGE: 0.02,
+
+            MAX_DRAWDOWN_PERCENTAGE: 0.15,
+
+            STRATEGY_WEIGHTS: {
+
+                BOLLINGER_BOUNCE: 1.0,
+
+                PIN_BAR_REJECTION: 1.0,
+
+                INSIDE_BAR_BREAK: 1.0,
+
+                ALLIGATOR_IMPULSE: 1.0,
+
+                GAP_FILL: 1.0,
+
+                PULLBACK_FIB: 1.0,
+
+                ENGULFING: 1.0,
+
+                GAP: 1.0,
+
+                TRAP_WICK_FADE: 1.0,
+
+                FALSE_BREAK_FADE: 1.0
+
+            },
+
+            ML_ADAPTIVE_WEIGHTS: true,
+
+            ML_TRAINING_DATA_SIZE: 1000,
+
+            OTC_SPREAD_ADJUSTMENT: 0.0005,
+
+            OTC_LIQUIDITY_FACTOR: 1.2,
+
+            EXECUTION_DELAY: 0.5,
+
+            TIMEFRAME_WEIGHTS: { 'M1': 0.3, 'M5': 0.3, 'M15': 0.2, 'H1': 0.2 },
+
+            REGIME_DETECTION_THRESHOLD: 0.7
+
+        },
+
+        pendingTrades: {},
+
+        activeTrades: {},
+
+        tradeHistory: [],
+
+        sessionLog: [],
+
+        candleState: {},
+
+        history: {},
+
+        signalsToday: 0,
+
+        cyclesToday: 0,
+
+        lastSignalMinuteByPair: {},
+
+        lastPullbackMinuteByPair: {},
+
+        firstTickSent: {},
+
+        lastEvalBucket: {},
+
+        statsByMotor: {},
+
+        scriptBoot: false,
+
+        pairWatch: {},
+
+        localLog: [],
+
+        lastSignalUI: null,
+
+        panelReady: false,
+
+        panelMinimized: false,
+
+        pairPayouts: {},
+
+        signalsThisHour: 0,
+
+        signalsPerPairHour: {},
+
+        lastHourReset: Math.floor(Date.now() / 3600000),
+
+        serverTimeOffset: 0,
+
+        lastTickTime: 0,
+
+        inactivityTimer: null,
+
+        tickCountByPair: {},
+
+        motorRecentResults: {},
+
+        deadZonePauseUntil: {},
+
+        pairRecentSignals: {},
+
+        motorConsecutiveCount: {},
+
+        motorPausedUntil: {},
+
+        lastMotorUsed: '',
+
+        lossLog: [],
+
+        backtestData: [],
+
+        backtestResults: null,
+
+        marketRegime: 'normal',
+
+        positionSize: 0.02,
+
+        drawdownProtection: false,
+
+        drawdownStartTime: 0,
+
+        lastEquity: 0,
+
+        currentEquity: 0,
+
+        winRate: 0,
+
+        profitFactor: 0,
+
+        maxDrawdown: 0
+
+    };
+
+    // ==================== DATA MANAGER ====================
+
+    class DataManager {
+
+        static initialize() {
+
+            BotState.history = {};
+
+            BotState.candleState = {};
+
+            BotState.tickCountByPair = {};
+
+        }
+
+        static processTick(pair, time, price) {
+
+            try {
+
+                if (typeof pair !== 'string' || !isFinite(time) || !isFinite(price)) return;
+
+                if (BotState.serverTimeOffset === 0) {
+
+                    BotState.serverTimeOffset = time - Math.floor(Date.now() / 1000);
+
+                }
+
+                const pairLabel = normalizePairFromTick(pair);
+
+                this.registerPair(pairLabel);
+
+                this.resetInactivityTimer();
+
+                const block60 = Math.floor(time / 60);
+
+                if (!BotState.tickCountByPair[pairLabel] ||
+
+                    BotState.candleState[pairLabel]?.m1?.block !== block60) {
+
+                    BotState.tickCountByPair[pairLabel] = 1;
+
+                } else {
+
+                    BotState.tickCountByPair[pairLabel]++;
+
+                }
+
+                // Handle expired trades
+
+                if (BotState.activeTrades[pairLabel] && time >= BotState.activeTrades[pairLabel].expiryTimestamp) {
+
+                    TradeManager.resolveTrade(pairLabel, BotState.activeTrades[pairLabel], price, time);
+
+                }
+
+                // Handle pending trades
+
+                if (BotState.pendingTrades[pairLabel] && !BotState.activeTrades[pairLabel]) {
+
+                    const pend = BotState.pendingTrades[pairLabel];
+
+                    if (time >= pend.entryTimestamp) {
+
+                        if (time - pend.entryTimestamp > 8) {
+
+                            console.log('Pending expired without entry:', pairLabel);
+
+                            delete BotState.pendingTrades[pairLabel];
+
+                        } else {
+
+                            BotState.activeTrades[pairLabel] = {
+
+                                direction: pend.direction,
+
+                                entryPrice: price,
+
+                                entryTimestamp: pend.entryTimestamp,
+
+                                expiryTimestamp: pend.expiryTimestamp,
+
+                                timeStr: pend.timeStr,
+
+                                motor: pend.motor,
+
+                                attempt: 1,
+
+                                alertSec: pend.alertSec
+
+                            };
+
+                            delete BotState.pendingTrades[pairLabel];
+
+                            console.log('Entry confirmed:', pairLabel);
+
+                            if (BotState.config.AUTOTRADE_ENABLED) {
+
+                                this.handleAutoTrade(pairLabel, pend.direction);
+
+                            }
+
+                        }
+
+                    } else if (pend.entryTimestamp - time > 90) {
+
+                        delete BotState.pendingTrades[pairLabel];
+
+                    }
+
+                }
+
+                if (!BotState.history[pairLabel]) {
+
+                    BotState.history[pairLabel] = { s15: [], m1: [], m5: [] };
+
+                }
+
+                const block15 = Math.floor(time / 15);
+
+                const block300 = Math.floor(time / 300);
+
+                if (!BotState.candleState[pairLabel]) {
+
+                    BotState.candleState[pairLabel] = {
+
+                        s15: { block: block15, open: price, high: price, low: price, close: price },
+
+                        m1: { block: block60, open: price, high: price, low: price, close: price },
+
+                        m5: { block: block300, open: price, high: price, low: price, close: price }
+
+                    };
+
+                }
+
+                const state = BotState.candleState[pairLabel];
+
+                function roll(tf, block, key, max) {
+
+                    if (state[tf].block !== block) {
+
+                        BotState.history[pairLabel][key].push({
+
+                            open: state[tf].open,
+
+                            high: state[tf].high,
+
+                            low: state[tf].low,
+
+                            close: state[tf].close
+
+                        });
+
+                        if (BotState.history[pairLabel][key].length > max) {
+
+                            BotState.history[pairLabel][key].shift();
+
+                        }
+
+                        state[tf] = {
+
+                            block: block,
+
+                            open: price,
+
+                            high: price,
+
+                            low: price,
+
+                            close: price
+
+                        };
+
+                        if (tf === 'm1') {
+
+                            BotState.tickCountByPair[pairLabel] = 1;
+
+                        }
+
+                    } else {
+
+                        state[tf].high = Math.max(state[tf].high, price);
+
+                        state[tf].low = Math.min(state[tf].low, price);
+
+                        state[tf].close = price;
+
+                    }
+
+                }
+
+                roll('s15', block15, 's15', 80);
+
+                roll('m1', block60, 'm1', 40);
+
+                roll('m5', block300, 'm5', 12);
+
+                // Evaluate signals if conditions met
+
+                if (this.canEvaluate(pairLabel, time)) {
+
+                    this.evaluateSignals(pairLabel, time);
+
+                }
+
+            } catch (err) {
+
+                console.error('[VIP processTick]', err);
+
+                this.uiLog('ERR processTick');
+
+            }
+
+        }
+
+        static canEvaluate(pairLabel, time) {
+
+            if (!BotState.config.BOT_RUNNING || BotState.cyclesToday >= BotState.config.MAX_SIGNALS_SESSION) {
+
+                return false;
+
+            }
+
+            if (BotState.config.OPERATION_MODE === 'normal' && this.hasOpenCycle()) {
+
+                return false;
+
+            }
+
+            if (BotState.activeTrades[pairLabel] || BotState.pendingTrades[pairLabel]) {
+
+                return false;
+
+            }
+
+            if (!this.isPairEnabled(pairLabel)) {
+
+                return false;
+
+            }
+
+            const secInMin = time % 60;
+
+            if (BotState.config.OPERATION_MODE !== 'test' &&
+
+                (secInMin < BotState.config.EVAL_SEC_START || secInMin > BotState.config.EVAL_SEC_END)) {
+
+                return false;
+
+            }
+
+            return true;
+
+        }
+
+        static evaluateSignals(pairLabel, time) {
+
+            StrategyEngine.evaluateAll(pairLabel, time);
+
+        }
+
+        static handleAutoTrade(pairLabel, direction) {
+
+            if (BotState.config.AUTOTRADE_ENABLED) {
+
+                const visiblePair = this.getVisiblePairFromUI();
+
+                const signalPairNormalized = pairLabel.toUpperCase().replace(/\s+/g, '').replace(/OTC/g, '').replace(/\//g, '');
+
+                if (visiblePair === signalPairNormalized) {
+
+                    this.autoClickButton(direction, false);
+
+                } else if (BotState.config.MULTI_PAR_ENABLED) {
+
+                    if (this.switchToFavoritePair(pairLabel)) {
+
+                        setTimeout(() => this.autoClickButton(direction, false), 300);
+
+                    }
+
+                }
+
+            }
+
+        }
+
+        static getVisiblePairFromUI() {
+
+            const selectors = [
+
+                '[class*="current-symbol"]',
+
+                '[class*="currentSymbol"]',
+
+                '[class*="pair-name"]',
+
+                '[class*="asset-name"]',
+
+                '[class*="symbol-name"]',
+
+                '.pair',
+
+                '[data-symbol]'
+
+            ];
+
+            for (let i = 0; i < selectors.length; i++) {
+
+                const el = document.querySelector(selectors[i]);
+
+                if (el) {
+
+                    const txt = (el.getAttribute('data-symbol') || el.textContent || '').trim();
+
+                    if (txt.length >= 6) {
+
+                        return txt.toUpperCase().replace(/\s+/g, '').replace(/OTC/g, '').replace(/\//g, '');
+
+                    }
+
+                }
+
+            }
+
+            return '';
+
+        }
+
+        static autoClickButton(direction, doubleClick) {
+
+            let items = document.querySelectorAll('.switch-state-block__item');
+
+            if (items.length >= 2) {
+
+                const btn = direction === 'CALL' ? items[0] : items[1];
+
+                if (btn && typeof btn.click === 'function') {
+
+                    btn.click();
+
+                    if (doubleClick) {
+
+                        setTimeout(() => btn.click(), 80);
+
+                    }
+
+                    return true;
+
+                }
+
+            }
+
+            const todos = document.querySelectorAll('button, [role="button"], div');
+
+            for (let i = 0; i < todos.length; i++) {
+
+                const rect = todos[i].getBoundingClientRect();
+
+                if (rect.width > 80 && rect.height > 30 && rect.top > window.innerHeight * 0.4) {
+
+                    if ((direction === 'CALL' && rect.left < window.innerWidth / 2) ||
+
+                        (direction === 'PUT' && rect.left > window.innerWidth / 2)) {
+
+                        todos[i].click();
+
+                        if (doubleClick) {
+
+                            setTimeout(() => todos[i].click(), 80);
+
+                        }
+
+                        return true;
+
+                    }
+
+                }
+
+            }
+
+            return false;
+
+        }
+
+        static switchToFavoritePair(targetPairLabel) {
+
+            const targetNormalized = normalizePairFromTick(targetPairLabel).toUpperCase().replace(/\s+/g, '').replace(/OTC/g, '').replace(/\//g, '');
+
+            const labels = document.querySelectorAll('.assets-favorites-item__label');
+
+            for (let i = 0; i < labels.length; i++) {
+
+                const label = labels[i];
+
+                const txt = (label.textContent || '').trim().toUpperCase().replace(/\s+/g, '').replace(/OTC/g, '').replace(/\//g, '');
+
+                if (txt === targetNormalized) {
+
+                    const item = label.closest('.assets-favorites-item');
+
+                    if (item && typeof item.click === 'function') {
+
+                        item.click();
+
+                        return true;
+
+                    }
+
+                }
+
+            }
+
+            const alistItems = document.querySelectorAll('.alist__item');
+
+            for (let j = 0; j < alistItems.length; j++) {
+
+                const alistText = (alistItems[j].textContent || '').trim().toUpperCase().replace(/\s+/g, '').replace(/OTC/g, '').replace(/\//g, '');
+
+                if (alistText.indexOf(targetNormalized) !== -1) {
+
+                    alistItems[j].click();
+
+                    return true;
+
+                }
+
+            }
+
+            return false;
+
+        }
+
+        static registerPair(pairLabel) {
+
+            if (!BotState.pairWatch[pairLabel]) {
+
+                const saved = this.loadPairStates();
+
+                const enabled = true;
+
+                const paused = false;
+
+                if (saved[pairLabel]) {
+
+                    const savedState = saved[pairLabel];
+
+                    if (savedState.enabled !== undefined) enabled = savedState.enabled !== false;
+
+                    if (savedState.paused !== undefined) paused = savedState.paused === true;
+
+                }
+
+                BotState.pairWatch[pairLabel] = { enabled: enabled, paused: paused, ticks: 0 };
+
+                this.uiLog('Par detectado: ' + this.formatPairDisplay(pairLabel));
+
+                UIController.renderPairList();
+
+            }
+
+            BotState.pairWatch[pairLabel].ticks += 1;
+
+        }
+
+        static isPairEnabled(pairLabel) {
+
+            if (BotState.deadZonePauseUntil[pairLabel] && Date.now() < BotState.deadZonePauseUntil[pairLabel]) {
+
+                return false;
+
+            }
+
+            if (!BotState.pairWatch[pairLabel]) return true;
+
+            return BotState.pairWatch[pairLabel].enabled !== false && BotState.pairWatch[pairLabel].paused !== true;
+
+        }
+
+        static resetInactivityTimer() {
+
+            BotState.lastTickTime = Date.now();
+
+            if (BotState.inactivityTimer) clearTimeout(BotState.inactivityTimer);
+
+            BotState.inactivityTimer = setTimeout(() => {
+
+                if (BotState.config.BOT_RUNNING && Date.now() - BotState.lastTickTime > 120000) {
+
+                    BotState.config.BOT_RUNNING = false;
+
+                    this.uiLog('⚠️ Bot pausado por inactividad (2 min sin ticks)');
+
+                    UIController.refreshPanelLive();
+
+                    this.savePrefs();
+
+                    this.sendTelegramMessage('⚠️ Bot pausado automáticamente por inactividad (>2 min sin datos)');
+
+                }
+
+            }, 120000);
+
+        }
+
+        static hasOpenCycle() {
+
+            for (const k in BotState.pendingTrades) {
+
+                if (BotState.pendingTrades.hasOwnProperty(k)) return true;
+
+            }
+
+            for (const k in BotState.activeTrades) {
+
+                if (BotState.activeTrades.hasOwnProperty(k)) return true;
+
+            }
+
+            return false;
+
+        }
+
+        static uiLog(msg) {
+
+            const t = this.getDisplayTime(Math.floor(Date.now() / 1000)).hms;
+
+            BotState.localLog.push({ t: t, msg: msg });
+
+            if (BotState.localLog.length > BotState.config.LOG_MAX_LINES) BotState.localLog.shift();
+
+            try {
+
+                console.log('[VIP]', msg);
+
+            } catch (e) {}
+
+            UIController.renderPanelLog();
+
+        }
+
+        static sendTelegramMessage(text, forceSend = false) {
+
+            if (!BotState.config.TELEGRAM_ENABLED && !forceSend) return;
+
+            // Add a unique identifier to ensure message uniqueness
+
+            const messageId = Date.now() + Math.random().toString(36).substr(2, 9);
+
+
+
+            try {
+
+                GM_xmlhttpRequest({
+
+                    method: 'POST',
+
+                    url: 'https://api.telegram.org/bot' + BotState.config.TELEGRAM_TOKEN + '/sendMessage',
+
+                    headers: { 'Content-Type': 'application/json' },
+
+                    data: JSON.stringify({
+
+                        chat_id: BotState.config.TELEGRAM_CHAT_ID,
+
+                        text: text + `\n<MessageId:${messageId}>`,
+
+                        parse_mode: 'HTML'
+
+                    }),
+
+                    onload: function(response) {
+
+                        // Log successful message send
+
+                        if (response.status === 200) {
+
+                            console.log('Telegram message sent successfully:', messageId);
+
+                        } else {
+
+                            console.warn('Telegram message failed:', response.status, response.responseText);
+
+                        }
+
+                    },
+
+                    onerror: function(error) {
+
+                        console.error('Telegram API error:', error);
+
+                        this.uiLog('TG error: ' + error.message);
+
+                    },
+
+                    ontimeout: function() {
+
+                        console.error('Telegram API timeout');
+
+                        this.uiLog('TG timeout');
+
+                    }
+
+                });
+
+            } catch (e) {
+
+                console.error('Exception in sendTelegramMessage:', e);
+
+                this.uiLog('TG exception: ' + e.message);
+
+            }
+
+        }
+
+        static getDisplayTime(ts) {
+
+            const d = new Date(ts * 1000);
+
+            const utc = d.getTime() + d.getTimezoneOffset() * 60000;
+
+            const nd = new Date(utc + BotState.config.DISPLAY_UTC_OFFSET_MIN * 60000);
+
+            function z(n) {
+
+                return String(n).padStart(2, '0');
+
+            }
+
+            return {
+
+                hm: z(nd.getHours()) + ':' + z(nd.getMinutes()),
+
+                hms: z(nd.getHours()) + ':' + z(nd.getMinutes()) + ':' + z(nd.getSeconds()),
+
+                dateDM: z(nd.getDate()) + '/' + z(nd.getMonth() + 1)
+
+            };
+
+        }
+
+        static formatPairDisplay(pair) {
+
+            const s = normalizePairFromTick(pair);
+
+            const otc = /OTC/i.test(s);
+
+            const m = s.match(/^([A-Z]{3})\s*([A-Z]{3})/i);
+
+            if (m) return m[1] + '/' + m[2] + (otc ? ' OTC' : '');
+
+            m = s.match(/^([A-Z]{6})/i);
+
+            if (m) return m[1].slice(0, 3) + '/' + m[1].slice(3, 6) + (otc ? ' OTC' : '');
+
+            return s;
+
+        }
+
+        static normalizePairFromTick(pair) {
+
+            return String(pair).toUpperCase().replace(/_OTC/gi, ' OTC').replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
+
+        }
+
+        static loadPairStates() {
+
+            try {
+
+                return JSON.parse(localStorage.getItem(PAIR_STATE_KEY) || '{}');
+
+            } catch (e) {
+
+                return {};
+
+            }
+
+        }
+
+        static savePairStates() {
+
+            try {
+
+                const states = {};
+
+                for (const k in BotState.pairWatch) {
+
+                    if (BotState.pairWatch.hasOwnProperty(k)) {
+
+                        states[k] = {
+
+                            enabled: BotState.pairWatch[k].enabled,
+
+                            paused: BotState.pairWatch[k].paused
+
+                        };
+
+                    }
+
+                }
+
+                localStorage.setItem(PAIR_STATE_KEY, JSON.stringify(states));
+
+            } catch (e) {}
+
+        }
+
+        static savePrefs() {
+
+            try {
+
+                localStorage.setItem(STORAGE_KEY, JSON.stringify({
+
+                    bot: BotState.config.BOT_RUNNING,
+
+                    tg: BotState.config.TELEGRAM_ENABLED,
+
+                    mode: BotState.config.OPERATION_MODE,
+
+                    autoTrade: BotState.config.AUTOTRADE_ENABLED,
+
+                    multiPar: BotState.config.MULTI_PAR_ENABLED,
+
+                    martingale: BotState.config.MARTINGALE_ENABLED,
+
+                    autoKill: BotState.config.AUTO_KILL_ENABLED,
+
+                    minPayout: BotState.config.MIN_PAYOUT,
+
+                    minConf: BotState.config.MIN_CONFLUENCE_SCORE,
+
+                    pull: BotState.config.PULLBACK_LEVEL,
+
+                    eng: BotState.config.ENGULF_LEVEL,
+
+                    enables: {
+
+                        ENABLE_BOLLINGER: BotState.config.ENABLE_BOLLINGER,
+
+                        ENABLE_PINBAR: BotState.config.ENABLE_PINBAR,
+
+                        ENABLE_INSIDE_BAR: BotState.config.ENABLE_INSIDE_BAR,
+
+                        ENABLE_ALLIGATOR: BotState.config.ENABLE_ALLIGATOR,
+
+                        ENABLE_GAP_FILL: BotState.config.ENABLE_GAP_FILL,
+
+                        ENABLE_PULLBACK: BotState.config.ENABLE_PULLBACK,
+
+                        ENABLE_ENGULFING: BotState.config.ENABLE_ENGULFING,
+
+                        ENABLE_GAP: BotState.config.ENABLE_GAP,
+
+                        ENABLE_TRAP_WICK: BotState.config.ENABLE_TRAP_WICK,
+
+                        ENABLE_FALSE_BREAK: BotState.config.ENABLE_FALSE_BREAK,
+
+                        ENABLE_STOCH_PULL: BotState.config.ENABLE_STOCH_PULL
+
+                    },
+
+                    positionSize: BotState.config.POSITION_SIZE_PERCENTAGE,
+
+                    maxDrawdown: BotState.config.MAX_DRAWDOWN_PERCENTAGE
+
+                }));
+
+                this.savePairStates();
+
+            } catch (e) {}
+
+        }
+
+        static loadPrefs() {
+
+            try {
+
+                const raw = localStorage.getItem(STORAGE_KEY);
+
+                return raw ? JSON.parse(raw) : null;
+
+            } catch (e) {
+
+                return null;
+
+            }
+
+        }
+
+    }
+
+    // ==================== INDICATOR ENGINE ====================
+
+    class IndicatorEngine {
+
+        static candleMetrics(c) {
+
+            const body = Math.abs(c.close - c.open);
+
+            const range = c.high - c.low;
+
+            return {
+
+                body,
+
+                range,
+
+                bodyRatio: range > 0 ? body / range : 0,
+
+                upperWick: c.high - Math.max(c.open, c.close),
+
+                lowerWick: Math.min(c.open, c.close) - c.low,
+
+                bullish: c.close >= c.open
+
+            };
+
+        }
+
+        static avgRange(candles, n) {
+
+            if (!candles.length) return 0;
+
+            const s = candles.slice(-n);
+
+            let sum = 0;
+
+            for (let i = 0; i < s.length; i++) {
+
+                sum += s[i].high - s[i].low;
+
+            }
+
+            return sum / s.length;
+
+        }
+
+        static getSMA(closes, period, offset = 0) {
+
+            if (closes.length < period + offset) return 0;
+
+            const start = closes.length - period - offset;
+
+            let sum = 0;
+
+            for (let i = start; i < start + period; i++) {
+
+                sum += closes[i];
+
+            }
+
+            return sum / period;
+
+        }
+
+        static getRSI(closes, period) {
+
+            if (closes.length < period + 1) return 50;
+
+            let gains = 0;
+
+            let losses = 0;
+
+            for (let i = closes.length - period; i < closes.length; i++) {
+
+                const diff = closes[i] - closes[i - 1];
+
+                if (diff > 0) gains += diff;
+
+                else losses -= diff;
+
+            }
+
+            const ag = gains / period;
+
+            const al = losses / period;
+
+            return al === 0 ? 100 : 100 - 100 / (1 + ag / al);
+
+        }
+
+        static getSMAWithShift(closes, period, shift) {
+
+            const start = closes.length - period - shift;
+
+            if (start < 0) return 0;
+
+            let sum = 0;
+
+            for (let i = start; i < start + period; i++) {
+
+                sum += closes[i];
+
+            }
+
+            return sum / period;
+
+        }
+
+        static getDeMarker(highs, lows, period, shift) {
+
+            const end = highs.length - shift;
+
+            const start = end - period;
+
+            if (start < 0) return 50;
+
+            let sumMax = 0;
+
+            let sumMin = 0;
+
+            for (let i = start; i < end; i++) {
+
+                sumMax += highs[i] > highs[i - 1] ? highs[i] - highs[i - 1] : 0;
+
+                sumMin += lows[i] < lows[i - 1] ? lows[i - 1] - lows[i] : 0;
+
+            }
+
+            const a = sumMax / period;
+
+            const b = sumMin / period;
+
+            return a + b === 0 ? 50 : a / (a + b) * 100;
+
+        }
+
+        static getMomentum(closes, period) {
+
+            return closes.length <= period ? 0 : closes[closes.length - 1] - closes[closes.length - 1 - period];
+
+        }
+
+        static getStochastic(highs, lows, closes, period, kSmooth, dSmooth) {
+
+            if (closes.length < period + kSmooth) return { k: 50, d: 50 };
+
+            const rawK = [];
+
+            for (let i = period - 1; i < closes.length; i++) {
+
+                let hh = -Infinity;
+
+                let ll = Infinity;
+
+                for (let j = i - period + 1; j <= i; j++) {
+
+                    if (highs[j] > hh) hh = highs[j];
+
+                    if (lows[j] < ll) ll = lows[j];
+
+                }
+
+                rawK.push(hh === ll ? 50 : (closes[i] - ll) / (hh - ll) * 100);
+
+            }
+
+            const smoothK = [];
+
+            for (let s = 0; s <= rawK.length - kSmooth; s++) {
+
+                let sum = 0;
+
+                for (let x = 0; x < kSmooth; x++) sum += rawK[s + x];
+
+                smoothK.push(sum / kSmooth);
+
+            }
+
+            const k = smoothK[smoothK.length - 1];
+
+            let d = k;
+
+            if (smoothK.length >= dSmooth) {
+
+                let sumD = 0;
+
+                for (let y = smoothK.length - dSmooth; y < smoothK.length; y++) sumD += smoothK[y];
+
+                d = sumD / dSmooth;
+
+            }
+
+            return { k, d };
+
+        }
+
+        static getEMA(closes, period) {
+
+            if (closes.length < period) return 0;
+
+            const k = 2 / (period + 1);
+
+            let ema = closes[closes.length - period];
+
+            for (let i = closes.length - period + 1; i < closes.length; i++) {
+
+                ema = closes[i] * k + ema * (1 - k);
+
+            }
+
+            return ema;
+
+        }
+
+        static getBollinger(closes, period, stdMult) {
+
+            if (closes.length < period) return { mid: 0, upper: 0, lower: 0 };
+
+            const slice = closes.slice(-period);
+
+            let sum = 0;
+
+            for (let i = 0; i < slice.length; i++) {
+
+                sum += slice[i];
+
+            }
+
+            const mid = sum / period;
+
+            let variance = 0;
+
+            for (let i = 0; i < slice.length; i++) {
+
+                variance += Math.pow(slice[i] - mid, 2);
+
+            }
+
+            const std = Math.sqrt(variance / period);
+
+            return {
+
+                mid,
+
+                upper: mid + std * stdMult,
+
+                lower: mid - std * stdMult
+
+            };
+
+        }
+
+        static m1Bias(m1) {
+
+            if (m1.length < 4) return 'FLAT';
+
+            const a = m1[m1.length - 2].close;
+
+            const b = m1[m1.length - 4].close;
+
+            return a > b ? 'UP' : a < b ? 'DOWN' : 'FLAT';
+
+        }
+
+        static regimeOK(m1Sim, chaos, dead, chop) {
+
+            if (m1Sim.length < 8) return false;
+
+            const avg = this.avgRange(m1Sim.slice(0, -1), 6);
+
+            if (avg <= 0) return false;
+
+            const cur = m1Sim[m1Sim.length - 1];
+
+            const r = cur.high - cur.low;
+
+            if (r > avg * chaos || r < avg * dead) return false;
+
+            const slice = m1Sim.slice(-chop);
+
+            let alts = 0;
+
+            let small = 0;
+
+            for (let i = 1; i < slice.length; i++) {
+
+                const m = this.candleMetrics(slice[i]);
+
+                if (m.bodyRatio < 0.35) small++;
+
+                if ((slice[i].close >= slice[i].open) !== (slice[i - 1].close >= slice[i - 1].open)) alts++;
+
+            }
+
+            return !(small >= 4 && alts >= 4);
+
+        }
+
+        static swingLevels(m1Sim) {
+
+            const slice = m1Sim.slice(-BotState.config.SWING_LOOKBACK, -1);
+
+            if (!slice.length) return { maxH: 0, minL: 0, range: 0 };
+
+            let maxH = -Infinity;
+
+            let minL = Infinity;
+
+            for (let i = 0; i < slice.length; i++) {
+
+                if (slice[i].high > maxH) maxH = slice[i].high;
+
+                if (slice[i].low < minL) minL = slice[i].low;
+
+            }
+
+            return { maxH, minL, range: maxH - minL };
+
+        }
+
+        static nearSR(price, levels, prox) {
+
+            if (levels.range <= 0) return false;
+
+            const band = levels.range * prox;
+
+            return Math.abs(price - levels.maxH) <= band || Math.abs(price - levels.minL) <= band;
+
+        }
+
+        static checkDeadZone(pairLabel, m1Sim) {
+
+            if (m1Sim.length < BotState.config.DEAD_ZONE_MINUTES) return false;
+
+            const slice = m1Sim.slice(-BotState.config.DEAD_ZONE_MINUTES);
+
+            let maxH = -Infinity;
+
+            let minL = Infinity;
+
+            for (let i = 0; i < slice.length; i++) {
+
+                if (slice[i].high > maxH) maxH = slice[i].high;
+
+                if (slice[i].low < minL) minL = slice[i].low;
+
+            }
+
+            const range = maxH - minL;
+
+            const price = m1Sim[m1Sim.length - 1].close;
+
+            if (price > 0 && range / price < BotState.config.DEAD_ZONE_PCT) {
+
+                BotState.deadZonePauseUntil[pairLabel] = Date.now() + BotState.config.DEAD_ZONE_PAUSE_MINUTES * 60000;
+
+                DataManager.uiLog('💤 Zona muerta ' + DataManager.formatPairDisplay(pairLabel) + ' - Pausado ' + BotState.config.DEAD_ZONE_PAUSE_MINUTES + ' min');
+
+                return true;
+
+            }
+
+            return false;
+
+        }
+
+        static detectCandlePatterns(candle, prevCandle) {
+
+            const patterns = [];
+
+            const metrics = this.candleMetrics(candle);
+
+            // Engulfing pattern
+
+            if (prevCandle) {
+
+                const prevMetrics = this.candleMetrics(prevCandle);
+
+                if (metrics.bullish && !prevMetrics.bullish &&
+
+                    candle.close >= prevCandle.open && candle.open <= prevCandle.close) {
+
+                    patterns.push('engulfing_bullish');
+
+                } else if (!metrics.bullish && prevMetrics.bullish &&
+
+                           candle.close <= prevCandle.open && candle.open >= prevCandle.close) {
+
+                    patterns.push('engulfing_bearish');
+
+                }
+
+            }
+
+            // Pin bar pattern
+
+            if (metrics.upperWick / metrics.range >= 0.55 && metrics.bodyRatio <= 0.35 && !metrics.bullish) {
+
+                patterns.push('pin_bar_bearish');
+
+            }
+
+            if (metrics.lowerWick / metrics.range >= 0.55 && metrics.bodyRatio <= 0.35 && metrics.bullish) {
+
+                patterns.push('pin_bar_bullish');
+
+            }
+
+            // Inside bar pattern
+
+            if (prevCandle && candle.high <= prevCandle.high && candle.low >= prevCandle.low) {
+
+                patterns.push('inside_bar');
+
+            }
+
+            // Doji pattern
+
+            if (metrics.bodyRatio <= 0.1) {
+
+                patterns.push('doji');
+
+            }
+
+            return patterns;
+
+        }
+
+    }
+
+    // ==================== STRATEGY ENGINE ====================
+
+    class StrategyEngine {
+
+        static evaluateAll(pair, time) {
+
+            if (!BotState.config.BOT_RUNNING || BotState.cyclesToday >= BotState.config.MAX_SIGNALS_SESSION) return;
+
+            if (BotState.config.OPERATION_MODE === 'normal' && DataManager.hasOpenCycle()) return;
+
+            if (BotState.activeTrades[pair] || BotState.pendingTrades[pair]) return;
+
+            if (!IndicatorEngine.regimeOK(
+
+                BotState.history[pair].m1,
+
+                BotState.config.CHAOS_MULT,
+
+                BotState.config.DEAD_RATIO,
+
+                BotState.config.CHOP_LOOKBACK
+
+            ) || IndicatorEngine.checkDeadZone(pair, BotState.history[pair].m1)) return;
+
+            // New filters based on CSV
+
+            const curPrice = BotState.history[pair].m1[BotState.history[pair].m1.length - 1].close;
+
+            if (curPrice < BotState.config.MIN_PRICE_FILTER) return;
+
+            if ((BotState.tickCountByPair[pair] || 0) < BotState.config.MIN_TICKS_PER_CANDLE) return;
+
+            const payout = BotState.pairPayouts[pair] || 85;
+
+            if (payout < BotState.config.MIN_PAYOUT) {
+
+                if (BotState.pairWatch[pair] && !BotState.pairWatch[pair].paused) {
+
+                    BotState.pairWatch[pair].paused = true;
+
+                    DataManager.uiLog('🟡 Auto-pausa ' + DataManager.formatPairDisplay(pair) + ' (Payout ' + payout + '%)');
+
+                    DataManager.savePairStates();
+
+                    UIController.renderPairList();
+
+                }
+
+                return;
+
+            } else if (BotState.pairWatch[pair] && BotState.pairWatch[pair].paused) {
+
+                BotState.pairWatch[pair].paused = false;
+
+                DataManager.uiLog('🟢 Auto-reactiva ' + DataManager.formatPairDisplay(pair));
+
+                DataManager.savePairStates();
+
+                UIController.renderPairList();
+
+            }
+
+            if (!DataManager.isPairEnabled(pair) ||
+
+                (BotState.tickCountByPair[pair] || 0) < BotState.config.MIN_TICKS_PER_CANDLE) return;
+
+            const share = this.getPairShare(pair);
+
+            if (share > BotState.config.PAIR_MAX_SHARE) return;
+
+            const levels = IndicatorEngine.swingLevels(BotState.history[pair].m1);
+
+            const cur = BotState.history[pair].m1[BotState.history[pair].m1.length - 1];
+
+            const m = IndicatorEngine.candleMetrics(cur);
+
+            const closes = BotState.history[pair].m1.map(c => c.close);
+
+            const highs = BotState.history[pair].m1.map(c => c.high);
+
+            const lows = BotState.history[pair].m1.map(c => c.low);
+
+            const maUp = IndicatorEngine.getSMA(closes, BotState.config.MA_PERIOD, 0) >
+
+                         IndicatorEngine.getSMA(closes, BotState.config.MA_PERIOD, BotState.config.MA_SLOPE_LOOKBACK);
+
+            const atr = IndicatorEngine.avgRange(BotState.history[pair].m1.slice(0, -1), 6);
+
+            const candidates = [];
+
+            function addCandidate(dir, motor, scoreObj, bonus) {
+
+                if (this.isMotorPaused(motor)) return;
+
+                const sc = scoreObj.total + (bonus || 0);
+
+                // RSI dead zone filter
+
+                if (BotState.config.RSI_DEAD_ZONE > 0 &&
+
+                    Math.abs(scoreObj.rsiValue - 50) < BotState.config.RSI_DEAD_ZONE) return;
+
+                if (sc >= BotState.config.MIN_CONFLUENCE_SCORE) {
+
+                    candidates.push({ dir, motor, score: sc, metrics: scoreObj });
+
+                }
+
+            }
+
+            // 1. Gap (REACTIVATED - relaxed parameters)
+
+            if (BotState.config.ENABLE_GAP && BotState.history[pair].m1.length >= 2) {
+
+                const prev = BotState.history[pair].m1[BotState.history[pair].m1.length - 2];
+
+                const gap = prev.close !== 0 ? (cur.open - prev.close) / Math.abs(prev.close) : 0;
+
+                if (gap >= BotState.config.PA_GAP_MIN_PCT && m.bullish && m.bodyRatio >= BotState.config.PA_MIN_BODY &&
+
+                    (maUp || IndicatorEngine.m1Bias(BotState.history[pair].m1) === 'UP')) {
+
+                    const score = this.confluenceScore('CALL', BotState.history[pair].m1, levels, true);
+
+                    addCandidate('CALL', 'PA · Gap', score, 0);
+
+                }
+
+                if (gap <= -BotState.config.PA_GAP_MIN_PCT && !m.bullish && m.bodyRatio >= BotState.config.PA_MIN_BODY &&
+
+                    (!maUp || IndicatorEngine.m1Bias(BotState.history[pair].m1) === 'DOWN')) {
+
+                    const score = this.confluenceScore('PUT', BotState.history[pair].m1, levels, true);
+
+                    addCandidate('PUT', 'PA · Gap', score, 0);
+
+                }
+
+            }
+
+            // 2. Gap Fill
+
+            if (BotState.config.ENABLE_GAP_FILL && BotState.history[pair].m1.length >= 2) {
+
+                const prevGap = BotState.history[pair].m1[BotState.history[pair].m1.length - 2];
+
+                const gapSize = prevGap.close !== 0 ? (cur.open - prevGap.close) / Math.abs(prevGap.close) : 0;
+
+                const gapAbs = Math.abs(gapSize);
+
+                if (gapAbs >= 0.00015 && gapAbs < 0.0008 && m.bodyRatio >= 0.3) {
+
+                    if (gapSize > 0 && !m.bullish && cur.close < prevGap.close + (cur.open - prevGap.close) * 0.6) {
+
+                        const score = this.confluenceScore('PUT', BotState.history[pair].m1, levels, true);
+
+                        addCandidate('PUT', 'Gap Fill', score, 0);
+
+                    }
+
+                    if (gapSize < 0 && m.bullish && cur.close > prevGap.close + (cur.open - prevGap.close) * 0.6) {
+
+                        const score = this.confluenceScore('CALL', BotState.history[pair].m1, levels, true);
+
+                        addCandidate('CALL', 'Gap Fill', score, 0);
+
+                    }
+
+                }
+
+            }
+
+            // 3. Trap Wick (REACTIVATED - relaxed parameters)
+
+            if (BotState.config.ENABLE_TRAP_WICK && m.range > 0 && levels.range > 0) {
+
+                if (m.upperWick / m.range >= BotState.config.PA_PIN_TRAP_WICK && !m.bullish &&
+
+                    IndicatorEngine.nearSR(cur.close, levels, BotState.config.SR_PROXIMITY)) {
+
+                    const score = this.confluenceScore('PUT', BotState.history[pair].m1, levels, true);
+
+                    addCandidate('PUT', 'Trap Wick Fade', score, 0);
+
+                }
+
+                if (m.lowerWick / m.range >= BotState.config.PA_PIN_TRAP_WICK && m.bullish &&
+
+                    IndicatorEngine.nearSR(cur.close, levels, BotState.config.SR_PROXIMITY)) {
+
+                    const score = this.confluenceScore('CALL', BotState.history[pair].m1, levels, true);
+
+                    addCandidate('CALL', 'Trap Wick Fade', score, 0);
+
+                }
+
+            }
+
+            // 4. False Break (REACTIVATED)
+
+            if (BotState.config.ENABLE_FALSE_BREAK && BotState.history[pair].m1.length >= BotState.config.BO_LOOKBACK + 1) {
+
+                const look = BotState.history[pair].m1.slice(-(BotState.config.BO_LOOKBACK + 1), -1);
+
+                let mx = -Infinity;
+
+                let mn = Infinity;
+
+                for (let li = 0; li < look.length; li++) {
+
+                    if (look[li].high > mx) mx = look[li].high;
+
+                    if (look[li].low < mn) mn = look[li].low;
+
+                }
+
+                if (cur.high > mx && cur.close < mx) {
+
+                    const score = this.confluenceScore('PUT', BotState.history[pair].m1, levels, true);
+
+                    addCandidate('PUT', 'False Break Fade', score, 0);
+
+                }
+
+                if (cur.low < mn && cur.close > mn) {
+
+                    const score = this.confluenceScore('CALL', BotState.history[pair].m1, levels, true);
+
+                    addCandidate('CALL', 'False Break Fade', score, 0);
+
+                }
+
+            }
+
+            // 5. Bollinger Bounce
+
+            if (BotState.config.ENABLE_BOLLINGER && BotState.history[pair].m1.length >= 25) {
+
+                const bb = IndicatorEngine.getBollinger(closes, BotState.config.BB_PERIOD, BotState.config.BB_STD);
+
+                const rsiBB = IndicatorEngine.getRSI(closes, BotState.config.RSI_PERIOD);
+
+                if ((cur.low <= bb.lower || cur.close < bb.lower) && rsiBB < 35) {
+
+                    const score = this.confluenceScore('CALL', BotState.history[pair].m1, levels, true);
+
+                    addCandidate('CALL', 'Bollinger Bounce', score, 0);
+
+                }
+
+                if ((cur.high >= bb.upper || cur.close > bb.upper) && rsiBB > 65) {
+
+                    const score = this.confluenceScore('PUT', BotState.history[pair].m1, levels, true);
+
+                    addCandidate('PUT', 'Bollinger Bounce', score, 0);
+
+                }
+
+            }
+
+            // 6. Pin Bar Rejection
+
+            if (BotState.config.ENABLE_PINBAR && m.range > 0 && levels.range > 0) {
+
+                if (m.lowerWick / m.range >= 0.55 && m.bodyRatio <= 0.35 && m.bullish &&
+
+                    IndicatorEngine.nearSR(cur.close, levels, 0.40)) {
+
+                    const score = this.confluenceScore('CALL', BotState.history[pair].m1, levels, true);
+
+                    addCandidate('CALL', 'Pin Bar Rejection', score, 0);
+
+                }
+
+                if (m.upperWick / m.range >= 0.55 && m.bodyRatio <= 0.35 && !m.bullish &&
+
+                    IndicatorEngine.nearSR(cur.close, levels, 0.40)) {
+
+                    const score = this.confluenceScore('PUT', BotState.history[pair].m1, levels, true);
+
+                    addCandidate('PUT', 'Pin Bar Rejection', score, 0);
+
+                }
+
+            }
+
+            // 7. Inside Bar
+
+            if (BotState.config.ENABLE_INSIDE_BAR && BotState.history[pair].m1.length >= 2) {
+
+                const prevIB = BotState.history[pair].m1[BotState.history[pair].m1.length - 2];
+
+                if (cur.high <= prevIB.high && cur.low >= prevIB.low && cur.high !== cur.low) {
+
+                    const range = cur.high - cur.low;
+
+                    if (cur.close > prevIB.high || (cur.close - prevIB.low) / range >= 0.8) {
+
+                        const score = this.confluenceScore('CALL', BotState.history[pair].m1, levels, true);
+
+                        addCandidate('CALL', 'Inside Bar Break', score, 0);
+
+                    } else if (cur.close < prevIB.low || (prevIB.high - cur.close) / range >= 0.8) {
+
+                        const score = this.confluenceScore('PUT', BotState.history[pair].m1, levels, true);
+
+                        addCandidate('PUT', 'Inside Bar Break', score, 0);
+
+                    }
+
+                }
+
+            }
+
+            // 8. Alligator
+
+            if (BotState.config.ENABLE_ALLIGATOR && BotState.history[pair].s15.length >= BotState.config.ALLIGATOR_MIN_S15) {
+
+                const c15 = BotState.history[pair].s15.map(c => c.close);
+
+                const h15 = BotState.history[pair].s15.map(c => c.high);
+
+                const l15 = BotState.history[pair].s15.map(c => c.low);
+
+                const cJ = IndicatorEngine.getSMAWithShift(c15, 15, 5);
+
+                const cT = IndicatorEngine.getSMAWithShift(c15, 10, 3);
+
+                const cL = IndicatorEngine.getSMAWithShift(c15, 5, 1);
+
+                const pT = IndicatorEngine.getSMAWithShift(c15, 10, 4);
+
+                const pL = IndicatorEngine.getSMAWithShift(c15, 5, 2);
+
+                const pJ = IndicatorEngine.getSMAWithShift(c15, 15, 6);
+
+                const dM = IndicatorEngine.getDeMarker(h15, l15, 15, 0);
+
+                const pD = IndicatorEngine.getDeMarker(h15, l15, 15, 1);
+
+                const mom = IndicatorEngine.getMomentum(c15, 15);
+
+                const ema20 = IndicatorEngine.getEMA(c15, 20);
+
+                if ((pL <= pT || pL <= pJ) && cL > cT && cL > cJ && pD < 70 && dM >= BotState.config.ALLIGATOR_DM_CALL &&
+
+                    mom > 0 && cur.close > ema20) {
+
+                    const score = this.confluenceScore('CALL', BotState.history[pair].m1, levels, true);
+
+                    addCandidate('CALL', 'Impulso Alligator', score, 0);
+
+                }
+
+                if ((pL >= pT || pL >= pJ) && cL < cT && cL < cJ && pD > 30 && dM <= BotState.config.ALLIGATOR_DM_PUT &&
+
+                    mom < 0 && cur.close < ema20) {
+
+                    const score = this.confluenceScore('PUT', BotState.history[pair].m1, levels, true);
+
+                    addCandidate('PUT', 'Impulso Alligator', score, 0);
+
+                }
+
+            }
+
+            // 9. Engulfing (with bonus)
+
+            if (BotState.config.ENABLE_ENGULFING && BotState.history[pair].m1.length >= 2) {
+
+                const prevE = BotState.history[pair].m1[BotState.history[pair].m1.length - 2];
+
+                const pE = IndicatorEngine.candleMetrics(prevE);
+
+                const bullE = !pE.bullish && m.bullish && cur.close >= prevE.open && cur.open <= prevE.close &&
+
+                              m.body >= pE.body * BotState.config.PA_ENGULF_BODY_MULT;
+
+                const bearE = pE.bullish && !m.bullish && cur.close <= prevE.open && cur.open >= prevE.close &&
+
+                              m.body >= pE.body * BotState.config.PA_ENGULF_BODY_MULT;
+
+                const sizeOk = m.bodyRatio >= BotState.config.PA_ENGULF_MIN_BODY &&
+
+                               pE.bodyRatio >= BotState.config.PA_ENGULF_PREV_BODY_MIN &&
+
+                               (atr <= 0 || m.range >= atr * BotState.config.PA_ENGULF_RANGE_ATR_MULT);
+
+                function engulfClose(cur, dir) {
+
+                    const r = cur.high - cur.low;
+
+                    if (r <= 0) return false;
+
+                    const thr = BotState.config.PA_ENGULF_CLOSE_EXTREME;
+
+                    return dir === 'CALL' ? (cur.close - cur.low) / r >= thr : (cur.high - cur.close) / r >= thr;
+
+                }
+
+                if (bullE && sizeOk && engulfClose(cur, 'CALL') &&
+
+                    (!BotState.config.PA_ENGULF_REQUIRE_TREND || maUp || IndicatorEngine.m1Bias(BotState.history[pair].m1) === 'UP') &&
+
+                    pE.bodyRatio >= 0.15) {
+
+                    const score = this.confluenceScore('CALL', BotState.history[pair].m1, levels, true);
+
+                    addCandidate('CALL', 'PA · Engulfing', score, BotState.config.PA_ENGULF_SCORE_BONUS);
+
+                }
+
+                if (bearE && sizeOk && engulfClose(cur, 'PUT') &&
+
+                    (!BotState.config.PA_ENGULF_REQUIRE_TREND || !maUp || IndicatorEngine.m1Bias(BotState.history[pair].m1) === 'DOWN') &&
+
+                    pE.bodyRatio >= 0.15) {
+
+                    const score = this.confluenceScore('PUT', BotState.history[pair].m1, levels, true);
+
+                    addCandidate('PUT', 'PA · Engulfing', score, BotState.config.PA_ENGULF_SCORE_BONUS);
+
+                }
+
+            }
+
+            // 10. Pullback Fib (with rejection wick)
+
+            if (BotState.config.ENABLE_PULLBACK && levels.range > 0) {
+
+                const rsi = IndicatorEngine.getRSI(closes, BotState.config.RSI_PERIOD);
+
+                function touchClassic(cur, levels, dir) {
+
+                    if (levels.range <= 0) return false;
+
+                    return dir === 'CALL' ? cur.low <= levels.maxH - levels.range * 0.5 :
+
+                                           cur.high >= levels.minL + levels.range * 0.5;
+
+                }
+
+                if (maUp && rsi < BotState.config.PULLBACK_RSI_CALL_MAX &&
+
+                    touchClassic(cur, levels, 'CALL') &&
+
+                    (m.range > 0 && m.lowerWick / m.range >= BotState.config.PULLBACK_REJECT_WICK)) {
+
+                    const score = this.confluenceScore('CALL', BotState.history[pair].m1, levels, true);
+
+                    addCandidate('CALL', 'Pullback Fib', score, 0);
+
+                }
+
+                if (!maUp && rsi > BotState.config.PULLBACK_RSI_PUT_MIN &&
+
+                    touchClassic(cur, levels, 'PUT') &&
+
+                    (m.range > 0 && m.upperWick / m.range >= BotState.config.PULLBACK_REJECT_WICK)) {
+
+                    const score = this.confluenceScore('PUT', BotState.history[pair].m1, levels, true);
+
+                    addCandidate('PUT', 'Pullback Fib', score, 0);
+
+                }
+
+            }
+
+            if (candidates.length === 0) return;
+
+            candidates.sort((a, b) => b.score - a.score);
+
+            const best = candidates[0];
+
+            const maxScore = best.score;
+
+            const topCandidates = candidates.filter(c => c.score === maxScore);
+
+            if (topCandidates.length > 1) {
+
+                best = topCandidates[Math.floor(Math.random() * topCandidates.length)];
+
+            }
+
+            this.updateMotorConsecutive(best.motor);
+
+            TradeManager.triggerSignal(pair, best.dir, time, best.motor, time % 60, best.score);
+
+        }
+
+        static confluenceScore(dir, m1Sim, levels, hasPattern) {
+
+            const closes = m1Sim.map(c => c.close);
+
+            const maUp = IndicatorEngine.getSMA(closes, BotState.config.MA_PERIOD, 0) >
+
+                         IndicatorEngine.getSMA(closes, BotState.config.MA_PERIOD, BotState.config.MA_SLOPE_LOOKBACK);
+
+            const rsi = IndicatorEngine.getRSI(closes, BotState.config.RSI_PERIOD);
+
+            const near = IndicatorEngine.nearSR(m1Sim[m1Sim.length - 1].close, levels, BotState.config.SR_PROXIMITY);
+
+            const trendOK = (dir === 'CALL' && (maUp || IndicatorEngine.m1Bias(m1Sim) === 'UP')) ||
+
+                            (dir === 'PUT' && (!maUp || IndicatorEngine.m1Bias(m1Sim) === 'DOWN'));
+
+            const rsiOK = (dir === 'CALL' && rsi >= 35 && rsi <= 62) ||
+
+                          (dir === 'PUT' && rsi >= 38 && rsi <= 65);
+
+            let score = hasPattern ? 1 : 0;
+
+            if (trendOK) score++;
+
+            if (rsiOK) score++;
+
+            if (near) score++;
+
+            return {
+
+                total: score,
+
+                trend: trendOK,
+
+                rsi: rsiOK,
+
+                sr: near,
+
+                rsiValue: rsi
+
+            };
+
+        }
+
+        static isMotorPaused(motor) {
+
+            return BotState.motorPausedUntil[motor] && Date.now() < BotState.motorPausedUntil[motor];
+
+        }
+
+        static updateMotorConsecutive(motor) {
+
+            if (motor === BotState.lastMotorUsed) {
+
+                BotState.motorConsecutiveCount[motor] = (BotState.motorConsecutiveCount[motor] || 0) + 1;
+
+            } else {
+
+                BotState.motorConsecutiveCount = {};
+
+                BotState.motorConsecutiveCount[motor] = 1;
+
+            }
+
+            BotState.lastMotorUsed = motor;
+
+            if (BotState.motorConsecutiveCount[motor] >= BotState.config.REPETITION_PAUSE_LIMIT) {
+
+                BotState.motorPausedUntil[motor] = Date.now() + BotState.config.REPETITION_PAUSE_MINUTES * 60000;
+
+                DataManager.uiLog('⏸️ Auto-pausa: ' + motor + ' por ' + BotState.config.REPETITION_PAUSE_MINUTES + ' min (' +
+
+                                 BotState.config.REPETITION_PAUSE_LIMIT + ' señales seguidas)');
+
+                BotState.motorConsecutiveCount = {};
+
+            }
+
+        }
+
+        static getPairShare(pairLabel) {
+
+            if (!BotState.pairRecentSignals[pairLabel]) return 0;
+
+            const cutoff = Date.now() - BotState.config.PAIR_DIVERSITY_WINDOW * 60000;
+
+            const recent = BotState.pairRecentSignals[pairLabel].filter(ts => ts >= cutoff);
+
+            BotState.pairRecentSignals[pairLabel] = recent;
+
+            let total = 0;
+
+            for (const p in BotState.pairRecentSignals) {
+
+                if (BotState.pairRecentSignals.hasOwnProperty(p)) {
+
+                    const valid = BotState.pairRecentSignals[p].filter(ts => ts >= cutoff);
+
+                    total += valid.length;
+
+                }
+
+            }
+
+            if (total === 0) return 0;
+
+            return recent.length / total;
+
+        }
+
+    }
+
+    // ==================== TRADE MANAGER ====================
+
+    class TradeManager {
+
+        static triggerSignal(pair, direction, time, motor, alertSec, confScore) {
+
+            const nowMin = Math.floor(time / 60);
+
+            if (nowMin - (BotState.lastSignalMinuteByPair[pair] || 0) < BotState.config.COOLDOWN_MINUTES_PER_PAIR) return false;
+
+            if (motor === 'Pullback Fib') {
+
+                if (nowMin - (BotState.lastPullbackMinuteByPair[pair] || 0) < BotState.config.PULLBACK_COOLDOWN_MIN) return false;
+
+                BotState.lastPullbackMinuteByPair[pair] = nowMin;
+
+            }
+
+            const nowHour = Math.floor(Date.now() / 3600000);
+
+            if (nowHour !== BotState.lastHourReset) {
+
+                BotState.signalsThisHour = 0;
+
+                BotState.signalsPerPairHour = {};
+
+                BotState.lastHourReset = nowHour;
+
+            }
+
+            if (BotState.signalsThisHour >= BotState.config.MAX_SIGNALS_PER_HOUR) return false;
+
+            if ((BotState.signalsPerPairHour[pair] || 0) >= BotState.config.MAX_SIGNALS_PER_PAIR_HOUR) return false;
+
+            BotState.signalsToday++;
+
+            BotState.signalsThisHour++;
+
+            BotState.signalsPerPairHour[pair] = (BotState.signalsPerPairHour[pair] || 0) + 1;
+
+            BotState.lastSignalMinuteByPair[pair] = nowMin;
+
+            if (!BotState.statsByMotor[motor]) {
+
+                BotState.statsByMotor[motor] = { w: 0, wG1: 0, l: 0 };
+
+            }
+
+            const entryTs = (nowMin + 1) * 60;
+
+            const tDisp = DataManager.getDisplayTime(entryTs);
+
+            BotState.pendingTrades[pair] = {
+
+                direction,
+
+                entryTimestamp: entryTs,
+
+                expiryTimestamp: entryTs + BotState.config.EXPIRY_TIME_SEC,
+
+                timeStr: tDisp.hm,
+
+                motor,
+
+                attempt: 1,
+
+                alertSec: alertSec
+
+            };
+
+            BotState.lastSignalUI = {
+
+                pair: DataManager.formatPairDisplay(pair),
+
+                dir: direction === 'CALL' ? 'CALL' : 'PUT',
+
+                motor,
+
+                hm: tDisp.hm
+
+            };
+
+            if (BotState.config.AUTOTRADE_ENABLED && BotState.config.MULTI_PAR_ENABLED) {
+
+                const signalNormalized = pair.toUpperCase().replace(/\s+/g, '').replace(/OTC/g, '').replace(/\//g, '');
+
+                const currentVisible = DataManager.getVisiblePairFromUI();
+
+                if (currentVisible !== signalNormalized) {
+
+                    DataManager.switchToFavoritePair(pair);
+
+                }
+
+            }
+
+            const isCall = direction === 'CALL';
+
+            const payout = BotState.pairPayouts[pair] || 85;
+
+            const confStr = confScore ? ' · conf ' + confScore + ' · seg ' + alertSec : '';
+
+            // Send Telegram message with force flag to ensure delivery
+
+            DataManager.sendTelegramMessage('💎 LIVE Edge💎\n🌐 Zona Horaria: UTC-1\n📊 DIVISA: ' +
+
+                                          DataManager.formatPairDisplay(pair) + '\n' +
+
+                                          (isCall ? '🟩' : '🟥') + ' DIRECCIÓN: ' +
+
+                                          (isCall ? 'CALL' : 'PUT') + '\n⏰ HORA DE ENTRADA: ' +
+
+                                          tDisp.hm + '\n⏱ TIEMPO: 1 minuto (M1)\n🧠 ' +
+
+                                          motor + confStr, true);
+
+            DataManager.uiLog('SEÑAL ' + DataManager.formatPairDisplay(pair) + ' ' + direction + ' · ' + motor + confStr);
+
+            this.recordPairSignal(pair);
+
+            UIController.refreshPanelLive();
+
+            this.autoKillCheck();
+
+            return true;
+
+        }
+
+        static resolveTrade(pairLabel, trade, price, tickTime) {
+
+            const motor = trade.motor;
+
+            const dir = trade.direction;
+
+            const attempt = trade.attempt || 1;
+
+            const disp = DataManager.formatPairDisplay(pairLabel);
+
+            const hm = trade.timeStr || DataManager.getDisplayTime(tickTime).hm;
+
+            if (!BotState.statsByMotor[motor]) {
+
+                BotState.statsByMotor[motor] = { w: 0, wG1: 0, l: 0 };
+
+            }
+
+            if ((dir === 'CALL' && price > trade.entryPrice) ||
+
+                (dir === 'PUT' && price < trade.entryPrice)) {
+
+                if (attempt === 1) {
+
+                    BotState.statsByMotor[motor].w++;
+
+                    BotState.tradeHistory.push({ result: 'WIN', motor });
+
+                    BotState.sessionLog.push({ pair: disp, hm, win: true, g1: false, dateDM: DataManager.getDisplayTime(tickTime).dateDM });
+
+                } else {
+
+                    BotState.statsByMotor[motor].wG1++;
+
+                    BotState.tradeHistory.push({ result: 'WIN_G1', motor });
+
+                    BotState.sessionLog.push({ pair: disp, hm, win: true, g1: true, dateDM: DataManager.getDisplayTime(tickTime).dateDM });
+
+                }
+
+                // Force send Telegram message for win
+
+                DataManager.sendTelegramMessage('✅ <b>WIN</b>' + (attempt === 2 ? ' (G1)' : '') + '\n' +
+
+                                              hm + ' | ' + disp + '\n🧠 ' + motor, true);
+
+                DataManager.uiLog('WIN' + (attempt === 2 ? ' G1' : '') + ' ' + disp + ' · ' + motor);
+
+                this.updateMotorRecent(motor, true);
+
+                delete BotState.activeTrades[pairLabel];
+
+                if (attempt === 1 || attempt === 2) {
+
+                    BotState.cyclesToday++;
+
+                }
+
+                this.maybeSummary();
+
+                UIController.refreshPanelLive();
+
+                return;
+
+            }
+
+            // LOSS: record data
+
+            const curCandle = BotState.candleState[pairLabel]?.m1;
+
+            const curMetrics = curCandle ? IndicatorEngine.candleMetrics(curCandle) : {};
+
+            BotState.lossLog.push({
+
+                date: DataManager.getDisplayTime(tickTime).dateDM,
+
+                time: DataManager.getDisplayTime(tickTime).hm,
+
+                pair: disp,
+
+                motor: motor,
+
+                dir: dir,
+
+                open: curCandle?.open?.toFixed(5) || '',
+
+                close: curCandle?.close?.toFixed(5) || '',
+
+                high: curCandle?.high?.toFixed(5) || '',
+
+                low: curCandle?.low?.toFixed(5) || '',
+
+                upperWick: curMetrics.upperWick?.toFixed(5) || '',
+
+                lowerWick: curMetrics.lowerWick?.toFixed(5) || '',
+
+                body: curMetrics.body?.toFixed(5) || '',
+
+                rsi: IndicatorEngine.getRSI((BotState.history[pairLabel]?.m1 || []).map(c => c.close).concat([curCandle?.close || 0]), BotState.config.RSI_PERIOD),
+
+                payout: BotState.pairPayouts[pairLabel] || 85,
+
+                ticks: BotState.tickCountByPair[pairLabel] || 0
+
+            });
+
+            const payout = BotState.pairPayouts[pairLabel] || 85;
+
+            const allowMartingale = BotState.config.MARTINGALE_ENABLED && payout >= BotState.config.MIN_PAYOUT_FOR_MARTINGALE;
+
+            if (attempt === 1 && allowMartingale && BotState.config.MARTINGALE_STEPS >= 1) {
+
+                const gTs = Math.floor(tickTime);
+
+                const gExp = gTs + BotState.config.EXPIRY_TIME_SEC;
+
+                BotState.activeTrades[pairLabel] = {
+
+                    direction: dir,
+
+                    entryPrice: price,
+
+                    entryTimestamp: gTs,
+
+                    expiryTimestamp: gExp,
+
+                    timeStr: DataManager.getDisplayTime(gTs).hm,
+
+                    motor,
+
+                    attempt: 2
+
+                };
+
+                if (BotState.config.AUTOTRADE_ENABLED) {
+
+                    const visiblePair = DataManager.getVisiblePairFromUI();
+
+                    const signalPairNormalized = pairLabel.toUpperCase().replace(/\s+/g, '').replace(/OTC/g, '').replace(/\//g, '');
+
+                    if (visiblePair === signalPairNormalized) {
+
+                        DataManager.autoClickButton(dir, true);
+
+                    } else if (BotState.config.MULTI_PAR_ENABLED && DataManager.switchToFavoritePair(pairLabel)) {
+
+                        setTimeout(() => DataManager.autoClickButton(dir, true), 400);
+
+                    } else {
+
+                        DataManager.uiLog('⏭️ AutoTrade Gale: par no coincide');
+
+                    }
+
+                }
+
+                // Force send Telegram message for gale
+
+                DataManager.sendTelegramMessage('🌀 GALE 1\n' + disp + '\n' +
+
+                                              (dir === 'CALL' ? '🟩' : '🟥') + ' ' +
+
+                                              (dir === 'CALL' ? 'CALL' : 'PUT') + ' · ' +
+
+                                              motor + '\n⏰ Exp ~' + DataManager.getDisplayTime(gExp).hm + ' (UTC-1)', true);
+
+                DataManager.uiLog('GALE1 ' + disp);
+
+                UIController.refreshPanelLive();
+
+                return;
+
+            }
+
+            BotState.statsByMotor[motor].l++;
+
+            BotState.tradeHistory.push({ result: 'LOSS', motor });
+
+            BotState.sessionLog.push({ pair: disp, hm, win: false, g1: false, dateDM: DataManager.getDisplayTime(tickTime).dateDM });
+
+            // Force send Telegram message for loss
+
+            DataManager.sendTelegramMessage('❌ <b>LOSS</b>' + (attempt === 2 ? ' (G1)' : '') + '\n' +
+
+                                          hm + ' | ' + disp + '\n🧠 ' + motor, true);
+
+            DataManager.uiLog('LOSS ' + disp + ' · ' + motor);
+
+            this.updateMotorRecent(motor, false);
+
+            delete BotState.activeTrades[pairLabel];
+
+            if (attempt === 1 || attempt === 2) {
+
+                BotState.cyclesToday++;
+
+            }
+
+            this.maybeSummary();
+
+            UIController.refreshPanelLive();
+
+        }
+
+        static updateMotorRecent(motor, isWin) {
+
+            if (!BotState.motorRecentResults[motor]) {
+
+                BotState.motorRecentResults[motor] = [];
+
+            }
+
+            BotState.motorRecentResults[motor].push(isWin);
+
+            while (BotState.motorRecentResults[motor].length > BotState.config.MOTOR_CONFIDENCE_WINDOW) {
+
+                BotState.motorRecentResults[motor].shift();
+
+            }
+
+        }
+
+        static recordPairSignal(pairLabel) {
+
+            if (!BotState.pairRecentSignals[pairLabel]) {
+
+                BotState.pairRecentSignals[pairLabel] = [];
+
+            }
+
+            BotState.pairRecentSignals[pairLabel].push(Date.now());
+
+            const cutoff = Date.now() - BotState.config.PAIR_DIVERSITY_WINDOW * 60000;
+
+            while (BotState.pairRecentSignals[pairLabel].length &&
+
+                   BotState.pairRecentSignals[pairLabel][0] < cutoff) {
+
+                BotState.pairRecentSignals[pairLabel].shift();
+
+            }
+
+        }
+
+        static maybeSummary() {
+
+            if (BotState.sessionLog.length && BotState.sessionLog.length % BotState.config.SUMMARY_EVERY_N === 0) {
+
+                DataManager.sendTelegramMessage(this.buildSessionSummary());
+
+            }
+
+        }
+
+        static buildSessionSummary() {
+
+            const dateStr = BotState.sessionLog.length ?
+
+                           BotState.sessionLog[0].dateDM :
+
+                           DataManager.getDisplayTime(Math.floor(DataManager.getAdjustedTime())).dateDM;
+
+            const lines = ['📋 <b>RESUMEN VIP Glass v5.9 PRO (' + dateStr + ')</b> 📋', '━━━━━━━━━━━━━━━━━━'];
+
+            let wins = 0;
+
+            let losses = 0;
+
+            for (let i = 0; i < BotState.sessionLog.length; i++) {
+
+                const o = BotState.sessionLog[i];
+
+                if (o.win) {
+
+                    wins++;
+
+                    lines.push('✅ ' + o.hm + ' | ' + o.pair + ' ➔ ' + (o.g1 ? 'WIN G1' : 'WIN'));
+
+                } else {
+
+                    losses++;
+
+                    lines.push('❌ ' + o.hm + ' | ' + o.pair + ' ➔ LOSS');
+
+                }
+
+            }
+
+            const tot = wins + losses;
+
+            const wr = tot ? Math.round(wins / tot * 100) : 0;
+
+            lines.push('━━━━━━━━━━━━━━━━━━', '📊 <b>BALANCE</b>', '🏆 ' + String(wins).padStart(2, '0') + 'W | 🛑 ' +
+
+                      String(losses).padStart(2, '0') + 'L', '📈 WR: <b>' + wr + '%</b>', '🎯 ' +
+
+                      BotState.cyclesToday + '/' + BotState.config.MAX_SIGNALS_SESSION + ' ciclos');
+
+            lines.push('🧠 <b>Por motor:</b>');
+
+            for (const m in BotState.statsByMotor) {
+
+                const s = BotState.statsByMotor[m];
+
+                const totalM = s.w + s.wG1 + s.l;
+
+                if (totalM > 0) lines.push(m + ': ' + (s.w + s.wG1) + 'W / ' + s.l + 'L');
+
+            }
+
+            return lines.join('\n');
+
+        }
+
+        static autoKillCheck() {
+
+            if (!BotState.config.AUTO_KILL_ENABLED) return;
+
+            const motors = [
+
+                { key: 'ENABLE_BOLLINGER', name: 'Bollinger Bounce' },
+
+                { key: 'ENABLE_PINBAR', name: 'Pin Bar Rejection' },
+
+                { key: 'ENABLE_INSIDE_BAR', name: 'Inside Bar Break' },
+
+                { key: 'ENABLE_ALLIGATOR', name: 'Impulso Alligator' },
+
+                { key: 'ENABLE_GAP_FILL', name: 'Gap Fill' },
+
+                { key: 'ENABLE_PULLBACK', name: 'Pullback Fib' },
+
+                { key: 'ENABLE_ENGULFING', name: 'PA · Engulfing' },
+
+                { key: 'ENABLE_GAP', name: 'PA · Gap' },
+
+                { key: 'ENABLE_TRAP_WICK', name: 'Trap Wick Fade' },
+
+                { key: 'ENABLE_FALSE_BREAK', name: 'False Break Fade' }
+
+            ];
+
+            const windowSize = BotState.config.AUTO_KILL_WINDOW;
+
+            const minWR = BotState.config.AUTO_KILL_MIN_WR;
+
+            for (let i = 0; i < motors.length; i++) {
+
+                const m = motors[i];
+
+                if (!BotState.config[m.key]) continue;
+
+                const recent = BotState.motorRecentResults[m.name] || [];
+
+                if (recent.length < windowSize) continue;
+
+                let wins = 0;
+
+                for (let j = recent.length - windowSize; j < recent.length; j++) {
+
+                    if (recent[j]) wins++;
+
+                }
+
+                const wr = wins / windowSize;
+
+                if (wr < minWR) {
+
+                    BotState.config[m.key] = false;
+
+                    DataManager.uiLog('💀 Auto-Kill: ' + m.name + ' desactivado (WR ' + (wr * 100).toFixed(0) + '%)');
+
+                }
+
+            }
+
+            DataManager.savePrefs();
+
+            UIController.applySavedPrefsToUi();
+
+        }
+
+    }
+
+    // ==================== UI CONTROLLER ====================
+
+    class UIController {
+
+        static ensurePanel() {
+
+            if (BotState.panelReady) return;
+
+            if (!document.body && !document.documentElement) {
+
+                setTimeout(UIController.ensurePanel, 300);
+
+                return;
+
+            }
+
+            this.injectPanelStyles();
+
+            this.injectPanelDom();
+
+            this.bindPanelEvents();
+
+            this.applySavedPrefsToUi();
+
+            BotState.panelReady = true;
+
+            setInterval(UIController.refreshPanelLive, 1000);
+
+            UIController.refreshPanelLive();
+
+            DataManager.uiLog('Panel Glass HUB v5.9 PRO listo');
+
+        }
+
+        static injectPanelStyles() {
+
+            if (document.getElementById('po-vip-panel-css')) return;
+
+            const css = document.createElement('style');
+
+            css.id = 'po-vip-panel-css';
+
+            css.textContent = `
+
+                #po-vip-panel {
+
+                    position: fixed;
+
+                    top: 40px;
+
+                    right: 10px;
+
+                    width: 380px;
+
+                    max-height: 520px;
+
+                    z-index: 2147483646;
+
+                    font-family: 'Inter', system-ui, sans-serif;
+
+                    color: #e2e8f0;
+
+                    border-radius: 14px;
+
+                    background: rgba(11,15,25,0.85);
+
+                    backdrop-filter: blur(25px);
+
+                    -webkit-backdrop-filter: blur(25px);
+
+                    border: 1px solid rgba(255,255,255,0.08);
+
+                    box-shadow: 0 20px 40px -10px rgba(0,0,0,0.7);
+
+                    overflow: hidden;
+
+                    user-select: none;
+
+                    display: flex;
+
+                    flex-direction: column;
+
+                }
+
+                #po-vip-panel.minimized .po-vip-tabs,
+
+                #po-vip-panel.minimized .po-vip-body {
+
+                    display: none;
+
+                }
+
+                .po-vip-topbar {
+
+                    display: flex;
+
+                    align-items: center;
+
+                    justify-content: space-between;
+
+                    padding: 8px 12px;
+
+                    background: rgba(255,255,255,0.03);
+
+                    border-bottom: 1px solid rgba(255,255,255,0.06);
+
+                    font-size: 11px;
+
+                }
+
+                .po-vip-tabs {
+
+                    display: flex;
+
+                    border-bottom: 1px solid rgba(255,255,255,0.06);
+
+                }
+
+                .po-vip-tab {
+
+                    flex: 1;
+
+                    text-align: center;
+
+                    padding: 7px 0;
+
+                    font-size: 10px;
+
+                    cursor: pointer;
+
+                    color: #64748b;
+
+                    transition: 0.2s;
+
+                }
+
+                .po-vip-tab.active {
+
+                    color: #38bdf8;
+
+                    border-bottom: 2px solid #38bdf8;
+
+                    background: rgba(56,189,248,0.05);
+
+                }
+
+                .po-vip-body {
+
+                    flex: 1;
+
+                    overflow-y: auto;
+
+                    padding: 10px 12px;
+
+                    max-height: 400px;
+
+                }
+
+                .po-vip-body::-webkit-scrollbar {
+
+                    width: 3px;
+
+                }
+
+                .po-vip-body::-webkit-scrollbar-thumb {
+
+                    background: rgba(255,255,255,0.1);
+
+                    border-radius: 3px;
+
+                }
+
+                .status-badge {
+
+                    font-size: 9px;
+
+                    padding: 2px 8px;
+
+                    border-radius: 20px;
+
+                    font-weight: 600;
+
+                    background: rgba(34,197,94,0.15);
+
+                    color: #4ade80;
+
+                    border: 1px solid rgba(34,197,94,0.3);
+
+                }
+
+                .status-badge.off {
+
+                    background: rgba(239,68,68,0.15);
+
+                    color: #f87171;
+
+                    border-color: rgba(239,68,68,0.3);
+
+                }
+
+                .po-vip-btn {
+
+                    background: rgba(255,255,255,0.05);
+
+                    border: 1px solid rgba(255,255,255,0.1);
+
+                    color: #cbd5e1;
+
+                    border-radius: 6px;
+
+                    padding: 3px 8px;
+
+                    cursor: pointer;
+
+                    font-size: 9px;
+
+                    transition: all 0.15s;
+
+                }
+
+                .po-vip-btn:hover {
+
+                    background: rgba(255,255,255,0.1);
+
+                    border-color: rgba(255,255,255,0.2);
+
+                    color: #fff;
+
+                }
+
+                .toggle-switch {
+
+                    position: relative;
+
+                    width: 36px;
+
+                    height: 18px;
+
+                    background: rgba(255,255,255,0.15);
+
+                    border-radius: 18px;
+
+                    cursor: pointer;
+
+                    transition: 0.25s;
+
+                    border: 1px solid rgba(255,255,255,0.08);
+
+                }
+
+                .toggle-switch.on {
+
+                    background: #22c55e;
+
+                    border-color: #22c55e;
+
+                }
+
+                .toggle-switch::after {
+
+                    content: '';
+
+                    position: absolute;
+
+                    top: 1px;
+
+                    left: 1px;
+
+                    width: 14px;
+
+                    height: 14px;
+
+                    background: #fff;
+
+                    border-radius: 50%;
+
+                    transition: 0.25s;
+
+                }
+
+                .toggle-switch.on::after {
+
+                    left: 19px;
+
+                }
+
+                .metric-card {
+
+                    background: rgba(255,255,255,0.02);
+
+                    border: 1px solid rgba(255,255,255,0.05);
+
+                    border-radius: 10px;
+
+                    padding: 8px 4px;
+
+                    text-align: center;
+
+                }
+
+                .metric-value {
+
+                    font-size: 16px;
+
+                    font-weight: 700;
+
+                }
+
+                .po-vip-signal {
+
+                    padding: 10px;
+
+                    border-radius: 12px;
+
+                    margin: 6px 0;
+
+                    text-align: center;
+
+                    background: rgba(0,0,0,0.2);
+
+                    border: 1px solid rgba(255,255,255,0.06);
+
+                }
+
+                .po-vip-signal.call {
+
+                    border-color: #22c55e;
+
+                    box-shadow: 0 0 12px rgba(34,197,94,0.1);
+
+                }
+
+                .po-vip-signal.put {
+
+                    border-color: #f87171;
+
+                    box-shadow: 0 0 12px rgba(248,113,113,0.1);
+
+                }
+
+                .po-vip-dir {
+
+                    font-size: 18px;
+
+                    font-weight: 800;
+
+                }
+
+                .pills-grid {
+
+                    display: flex;
+
+                    flex-wrap: wrap;
+
+                    gap: 5px;
+
+                }
+
+                .pill {
+
+                    padding: 4px 8px;
+
+                    border-radius: 16px;
+
+                    font-size: 9px;
+
+                    background: rgba(255,255,255,0.04);
+
+                    border: 1px solid rgba(255,255,255,0.08);
+
+                    color: #94a3b8;
+
+                    cursor: pointer;
+
+                    transition: 0.2s;
+
+                }
+
+                .pill.active {
+
+                    background: rgba(56,189,248,0.15);
+
+                    border-color: #38bdf8;
+
+                    color: #7dd3fc;
+
+                }
+
+                .pair-grid {
+
+                    display: flex;
+
+                    flex-wrap: wrap;
+
+                    gap: 5px;
+
+                    max-height: 180px;
+
+                    overflow-y: auto;
+
+                }
+
+                .pair-card {
+
+                    display: inline-flex;
+
+                    align-items: center;
+
+                    gap: 4px;
+
+                    background: rgba(255,255,255,0.03);
+
+                    border: 1px solid rgba(255,255,255,0.06);
+
+                    border-radius: 6px;
+
+                    padding: 3px 7px;
+
+                    font-size: 9px;
+
+                }
+
+                .pair-card.off {
+
+                    opacity: 0.4;
+
+                }
+
+                .po-vip-log {
+
+                    background: #0a0e17;
+
+                    border: 1px solid rgba(255,255,255,0.05);
+
+                    border-radius: 8px;
+
+                    padding: 6px 8px;
+
+                    height: 120px;
+
+                    overflow-y: auto;
+
+                    font-family: 'JetBrains Mono', monospace;
+
+                    font-size: 9px;
+
+                    color: #94a3b8;
+
+                }
+
+                select.po-vip-sel,
+
+                input.po-vip-inp {
+
+                    background: rgba(0,0,0,0.4);
+
+                    color: #e2e8f0;
+
+                    border: 1px solid rgba(255,255,255,0.1);
+
+                    border-radius: 6px;
+
+                    padding: 3px 6px;
+
+                    font-size: 9px;
+
+                }
+
+                .motor-row {
+
+                    display: flex;
+
+                    justify-content: space-between;
+
+                    align-items: center;
+
+                    margin: 3px 0;
+
+                    font-size: 10px;
+
+                }
+
+                .tab-content {
+
+                    display: none;
+
+                }
+
+                .tab-content.active {
+
+                    display: block;
+
+                }
+
+            `;
+
+            (document.head || document.documentElement).appendChild(css);
+
+        }
+
+        static injectPanelDom() {
+
+            if (document.getElementById('po-vip-panel')) return;
+
+            const root = document.createElement('div');
+
+            root.id = 'po-vip-panel';
+
+            root.innerHTML = `
+
+                <div class="po-vip-topbar" id="po-vip-drag">
+
+                    <span style="font-weight:700;font-size:12px;">💎 VIP GLASS HUB v5.9 PRO</span>
+
+                    <span class="status-badge" id="po-status-badge">🟢 LIVE</span>
+
+                    <span id="po-global-wr" style="font-size:10px;color:#fbbf24;margin-left:8px;"></span>
+
+                    <span id="po-autotrade-status" style="font-size:10px;color:#38bdf8;margin-left:8px;"></span>
+
+                    <button class="po-vip-btn" id="po-vip-min">—</button>
+
+                </div>
+
+                <div class="po-vip-tabs">
+
+                    <div class="po-vip-tab active" data-tab="dashboard">📊 Dashboard</div>
+
+                    <div class="po-vip-tab" data-tab="strategies">🧠 Estrategias</div>
+
+                    <div class="po-vip-tab" data-tab="pairs">🌐 Pares</div>
+
+                    <div class="po-vip-tab" data-tab="backtest">🧪 Backtest</div>
+
+                    <div class="po-vip-tab" data-tab="settings">⚙️ Ajustes</div>
+
+                </div>
+
+                <div class="po-vip-body">
+
+                    <div id="tab-dashboard" class="tab-content active">
+
+                        <div id="po-vip-signal" class="po-vip-signal">
+
+                            <div class="muted">Sin señal activa</div>
+
+                        </div>
+
+                        <div style="display:flex;gap:6px;margin:8px 0;">
+
+                            <div class="metric-card">
+
+                                <div class="muted" style="font-size:8px;">Señales</div>
+
+                                <div class="metric-value" id="m-signals">0</div>
+
+                            </div>
+
+                            <div class="metric-card">
+
+                                <div class="muted" style="font-size:8px;">Wins</div>
+
+                                <div class="metric-value" style="color:#4ade80;" id="m-wins">0</div>
+
+                            </div>
+
+                            <div class="metric-card">
+
+                                <div class="muted" style="font-size:8px;">Losses</div>
+
+                                <div class="metric-value" style="color:#f87171;" id="m-losses">0</div>
+
+                            </div>
+
+                            <div class="metric-card">
+
+                                <div class="muted" style="font-size:8px;">WR</div>
+
+                                <div class="metric-value" style="color:#38bdf8;" id="m-wr">0%</div>
+
+                            </div>
+
+                        </div>
+
+                        <h4 style="margin:8px 0 4px;font-size:10px;color:#64748b;">Terminal</h4>
+
+                        <div class="po-vip-log" id="po-vip-log"></div>
+
+                    </div>
+
+                    <div id="tab-strategies" class="tab-content">
+
+                        <h4 style="margin:4px 0;font-size:10px;color:#64748b;">Toggles</h4>
+
+                        <div class="pills-grid" id="po-strats-pills">
+
+                            <div class="pill active" data-en="ENABLE_BOLLINGER">Bollinger</div>
+
+                            <div class="pill active" data-en="ENABLE_PINBAR">Pin Bar</div>
+
+                            <div class="pill active" data-en="ENABLE_INSIDE_BAR">Inside Bar</div>
+
+                            <div class="pill active" data-en="ENABLE_ALLIGATOR">Alligator</div>
+
+                            <div class="pill active" data-en="ENABLE_GAP_FILL">Gap Fill</div>
+
+                            <div class="pill active" data-en="ENABLE_PULLBACK">Pullback</div>
+
+                            <div class="pill active" data-en="ENABLE_ENGULFING">Engulfing</div>
+
+                            <div class="pill active" data-en="ENABLE_GAP">Gap</div>
+
+                            <div class="pill active" data-en="ENABLE_TRAP_WICK">Trap</div>
+
+                            <div class="pill active" data-en="ENABLE_FALSE_BREAK">F.Break</div>
+
+                        </div>
+
+                        <h4 style="margin:8px 0 4px;font-size:10px;color:#64748b;">Niveles</h4>
+
+                        <div class="row">
+
+                            <span style="font-size:10px;">Pullback</span>
+
+                            <select class="po-vip-sel" id="po-vip-pull-level">
+
+                                <option value="weak" selected>Débil</option>
+
+                                <option value="normal">Normal</option>
+
+                                <option value="pro">Pro</option>
+
+                            </select>
+
+                        </div>
+
+                        <div class="row" style="margin-top:4px;">
+
+                            <span style="font-size:10px;">Engulfing</span>
+
+                            <select class="po-vip-sel" id="po-vip-eng-level">
+
+                                <option value="weak">Débil</option>
+
+                                <option value="normal" selected>Normal</option>
+
+                                <option value="pro">Pro</option>
+
+                            </select>
+
+                        </div>
+
+                        <button class="po-vip-btn" id="po-vip-auto-top3" style="margin:8px 0;width:100%;">⚡ Auto-Top 3</button>
+
+                        <h4 style="margin:4px 0;font-size:10px;color:#64748b;">Rendimiento por motor</h4>
+
+                        <div id="po-vip-motor-stats"><span class="muted">Sin datos</span></div>
+
+                    </div>
+
+                    <div id="tab-pairs" class="tab-content">
+
+                        <div class="pair-grid" id="po-vip-pairs"><span class="muted">Esperando ticks...</span></div>
+
+                        <div style="margin-top:8px;display:flex;gap:6px;">
+
+                            <button class="po-vip-btn" id="po-vip-pairs-all">Todos ON</button>
+
+                            <button class="po-vip-btn" id="po-vip-pairs-none">Todos OFF</button>
+
+                        </div>
+
+                    </div>
+
+                    <div id="tab-backtest" class="tab-content">
+
+                        <div class="row">
+
+                            <span style="font-size:10px;">Modo</span>
+
+                            <select class="po-vip-sel" id="po-vip-backtest-mode">
+
+                                <option value="off">Desactivado</option>
+
+                                <option value="on">Activado</option>
+
+                            </select>
+
+                        </div>
+
+                        <div class="row" style="margin-top:8px;">
+
+                            <button class="po-vip-btn" id="po-vip-run-backtest" style="width:100%;">▶️ Ejecutar Backtest</button>
+
+                        </div>
+
+                        <h4 style="margin:8px 0 4px;font-size:10px;color:#64748b;">Resultados</h4>
+
+                        <div class="po-vip-log" id="po-vip-backtest-results"></div>
+
+                    </div>
+
+                    <div id="tab-settings" class="tab-content">
+
+                        <div class="row">
+
+                            <span style="font-size:10px;">Modo</span>
+
+                            <select class="po-vip-sel" id="po-vip-op-mode">
+
+                                <option value="normal" selected>Normal</option>
+
+                                <option value="test">Prueba</option>
+
+                            </select>
+
+                        </div>
+
+                        <div class="row">
+
+                            <span style="font-size:10px;">🤖 AutoTrade DEMO</span>
+
+                            <div class="toggle-switch" id="po-vip-autotrade-toggle"></div>
+
+                        </div>
+
+                        <div class="row">
+
+                            <span style="font-size:10px;">🌐 Multi‑Par (Favoritos)</span>
+
+                            <div class="toggle-switch" id="po-vip-multipar-toggle"></div>
+
+                        </div>
+
+                        <div class="row">
+
+                            <span style="font-size:10px;">🔂 Martingala (Gale)</span>
+
+                            <div class="toggle-switch on" id="po-vip-martingale-toggle"></div>
+
+                        </div>
+
+                        <div class="row">
+
+                            <span style="font-size:10px;">📊 Confluencia mín</span>
+
+                            <select class="po-vip-sel" id="po-vip-min-conf">
+
+                                <option value="1" selected>1 (Normal)</option>
+
+                                <option value="2">2 (Alta)</option>
+
+                                <option value="3">3 (Ultra‑Estricta)</option>
+
+                            </select>
+
+                        </div>
+
+                        <div class="row">
+
+                            <span style="font-size:10px;">Payout Mín</span>
+
+                            <input class="po-vip-inp" id="po-vip-min-payout" value="80" style="width:50px;">
+
+                        </div>
+
+                        <div class="row">
+
+                            <span style="font-size:10px;">Bot Engine</span>
+
+                            <div class="toggle-switch on" id="po-vip-bot-toggle"></div>
+
+                        </div>
+
+                        <div class="row">
+
+                            <span style="font-size:10px;">Telegram</span>
+
+                            <div class="toggle-switch on" id="po-vip-tg-toggle"></div>
+
+                        </div>
+
+                        <div class="row">
+
+                            <span style="font-size:10px;">Auto-Kill</span>
+
+                            <div class="toggle-switch on" id="po-vip-autokill-toggle"></div>
+
+                        </div>
+
+                        <div class="row">
+
+                            <span style="font-size:10px;">Tamaño Posición (%)</span>
+
+                            <input class="po-vip-inp" id="po-vip-position-size" value="2" style="width:50px;">
+
+                        </div>
+
+                        <div class="row">
+
+                            <span style="font-size:10px;">Máx Drawdown (%)</span>
+
+                            <input class="po-vip-inp" id="po-vip-max-drawdown" value="15" style="width:50px;">
+
+                        </div>
+
+                        <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">
+
+                            <button class="po-vip-btn" id="po-vip-summary">📋 Resumen TG</button>
+
+                            <button class="po-vip-btn" id="po-vip-log-clear">🗑️ Clear</button>
+
+                            <button class="po-vip-btn" id="po-vip-save">💾 Save</button>
+
+                            <button class="po-vip-btn" id="po-vip-export-csv">📥 Exportar CSV</button>
+
+                        </div>
+
+                    </div>
+
+                </div>
+
+            `;
+
+            (document.body || document.documentElement).appendChild(root);
+
+            this.makeDraggable(root, document.getElementById('po-vip-drag'));
+
+        }
+
+        static makeDraggable(panel, handle) {
+
+            let dragging = false;
+
+            let ox = 0;
+
+            let oy = 0;
+
+            handle.addEventListener('mousedown', function (e) {
+
+                if (e.button !== 0 || e.target.closest('.po-vip-log, .po-vip-pairs, .pills-grid')) return;
+
+                dragging = true;
+
+                const r = panel.getBoundingClientRect();
+
+                ox = e.clientX - r.left;
+
+                oy = e.clientY - r.top;
+
+                panel.style.right = 'auto';
+
+                panel.style.left = r.left + 'px';
+
+                panel.style.top = r.top + 'px';
+
+                e.preventDefault();
+
+            });
+
+            window.addEventListener('mousemove', function (e) {
+
+                if (!dragging) return;
+
+                panel.style.left = Math.min(window.innerWidth - 48, Math.max(0, e.clientX - ox)) + 'px';
+
+                panel.style.top = Math.min(window.innerHeight - 40, Math.max(0, e.clientY - oy)) + 'px';
+
+            });
+
+            window.addEventListener('mouseup', function () {
+
+                if (dragging) {
+
+                    dragging = false;
+
+                    DataManager.savePrefs();
+
+                }
+
+            });
+
+        }
+
+        static bindPanelEvents() {
+
+            document.querySelectorAll('.po-vip-tab').forEach(function(tab) {
+
+                tab.addEventListener('click', function() {
+
+                    document.querySelectorAll('.po-vip-tab').forEach(t => t.classList.remove('active'));
+
+                    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+                    this.classList.add('active');
+
+                    document.getElementById('tab-' + this.dataset.tab).classList.add('active');
+
+                });
+
+            });
+
+            document.getElementById('po-vip-min').addEventListener('click', function () {
+
+                BotState.panelMinimized = !BotState.panelMinimized;
+
+                document.getElementById('po-vip-panel').classList.toggle('minimized', BotState.panelMinimized);
+
+            });
+
+            document.getElementById('po-vip-bot-toggle').addEventListener('click', function () {
+
+                BotState.config.BOT_RUNNING = !BotState.config.BOT_RUNNING;
+
+                this.classList.toggle('on', BotState.config.BOT_RUNNING);
+
+                document.getElementById('po-status-badge').textContent = BotState.config.BOT_RUNNING ? '🟢 LIVE' : '🔴 OFF';
+
+                document.getElementById('po-status-badge').className = 'status-badge' + (BotState.config.BOT_RUNNING ? '' : ' off');
+
+                DataManager.uiLog('Bot ' + (BotState.config.BOT_RUNNING ? 'ON' : 'OFF'));
+
+                DataManager.savePrefs();
+
+                UIController.refreshPanelLive();
+
+            });
+
+            document.getElementById('po-vip-tg-toggle').addEventListener('click', function () {
+
+                BotState.config.TELEGRAM_ENABLED = !BotState.config.TELEGRAM_ENABLED;
+
+                this.classList.toggle('on', BotState.config.TELEGRAM_ENABLED);
+
+                DataManager.uiLog('Telegram ' + (BotState.config.TELEGRAM_ENABLED ? 'ON' : 'OFF'));
+
+                DataManager.savePrefs();
+
+            });
+
+            document.getElementById('po-vip-autokill-toggle').addEventListener('click', function () {
+
+                BotState.config.AUTO_KILL_ENABLED = !BotState.config.AUTO_KILL_ENABLED;
+
+                this.classList.toggle('on', BotState.config.AUTO_KILL_ENABLED);
+
+                DataManager.uiLog('Auto-Kill ' + (BotState.config.AUTO_KILL_ENABLED ? 'ON' : 'OFF'));
+
+                DataManager.savePrefs();
+
+            });
+
+            document.getElementById('po-vip-autotrade-toggle').addEventListener('click', function () {
+
+                BotState.config.AUTOTRADE_ENABLED = !BotState.config.AUTOTRADE_ENABLED;
+
+                this.classList.toggle('on', BotState.config.AUTOTRADE_ENABLED);
+
+                DataManager.uiLog('AutoTrade DEMO ' + (BotState.config.AUTOTRADE_ENABLED ? 'ON' : 'OFF'));
+
+                DataManager.savePrefs();
+
+                UIController.refreshPanelLive();
+
+            });
+
+            document.getElementById('po-vip-multipar-toggle').addEventListener('click', function () {
+
+                BotState.config.MULTI_PAR_ENABLED = !BotState.config.MULTI_PAR_ENABLED;
+
+                this.classList.toggle('on', BotState.config.MULTI_PAR_ENABLED);
+
+                DataManager.uiLog('Multi‑Par Favoritos ' + (BotState.config.MULTI_PAR_ENABLED ? 'ON' : 'OFF'));
+
+                DataManager.savePrefs();
+
+                UIController.refreshPanelLive();
+
+            });
+
+            document.getElementById('po-vip-martingale-toggle').addEventListener('click', function () {
+
+                BotState.config.MARTINGALE_ENABLED = !BotState.config.MARTINGALE_ENABLED;
+
+                this.classList.toggle('on', BotState.config.MARTINGALE_ENABLED);
+
+                DataManager.uiLog('Martingala ' + (BotState.config.MARTINGALE_ENABLED ? 'ON' : 'OFF'));
+
+                DataManager.savePrefs();
+
+                UIController.refreshPanelLive();
+
+            });
+
+            document.getElementById('po-vip-min-conf').addEventListener('change', function () {
+
+                BotState.config.MIN_CONFLUENCE_SCORE = parseInt(this.value) || 1;
+
+                DataManager.uiLog('Confluencia mínima → ' + BotState.config.MIN_CONFLUENCE_SCORE);
+
+                DataManager.savePrefs();
+
+            });
+
+            document.getElementById('po-vip-op-mode').addEventListener('change', function () {
+
+                BotState.config.OPERATION_MODE = this.value;
+
+                DataManager.uiLog('Modo → ' + (this.value === 'normal' ? 'Normal' : 'Prueba'));
+
+                DataManager.savePrefs();
+
+            });
+
+            document.getElementById('po-vip-min-payout').addEventListener('change', function () {
+
+                BotState.config.MIN_PAYOUT = parseInt(this.value) || 80;
+
+                DataManager.uiLog('Payout mínimo → ' + BotState.config.MIN_PAYOUT + '%');
+
+                DataManager.savePrefs();
+
+            });
+
+            document.getElementById('po-vip-pull-level').addEventListener('change', function () {
+
+                BotState.config.PULLBACK_LEVEL = this.value;
+
+                DataManager.uiLog('Pullback → ' + this.value);
+
+                DataManager.savePrefs();
+
+            });
+
+            document.getElementById('po-vip-eng-level').addEventListener('change', function () {
+
+                BotState.config.ENGULF_LEVEL = this.value;
+
+                DataManager.uiLog('Engulfing → ' + this.value);
+
+                DataManager.savePrefs();
+
+            });
+
+            const pills = document.querySelectorAll('#po-strats-pills .pill');
+
+            for (let i = 0; i < pills.length; i++) {
+
+                pills[i].addEventListener('click', function () {
+
+                    const key = this.getAttribute('data-en');
+
+                    BotState.config[key] = !BotState.config[key];
+
+                    this.classList.toggle('active', BotState.config[key]);
+
+                    DataManager.uiLog(key.replace('ENABLE_', '') + ' = ' + BotState.config[key]);
+
+                    DataManager.savePrefs();
+
+                });
+
+            }
+
+            document.getElementById('po-vip-auto-top3').addEventListener('click', function () {
+
+                UIController.autoTop3();
+
+            });
+
+            document.getElementById('po-vip-pairs-all').addEventListener('click', function () {
+
+                UIController.setAllPairsEnabled(true);
+
+                DataManager.uiLog('Pares ON');
+
+            });
+
+            document.getElementById('po-vip-pairs-none').addEventListener('click', function () {
+
+                UIController.setAllPairsEnabled(false);
+
+                DataManager.uiLog('Pares OFF');
+
+            });
+
+            document.getElementById('po-vip-summary').addEventListener('click', function () {
+
+                DataManager.sendTelegramMessage(TradeManager.buildSessionSummary());
+
+                DataManager.uiLog('Resumen enviado');
+
+            });
+
+            document.getElementById('po-vip-log-clear').addEventListener('click', function () {
+
+                BotState.localLog = [];
+
+                UIController.renderPanelLog();
+
+            });
+
+            document.getElementById('po-vip-save').addEventListener('click', function () {
+
+                DataManager.savePrefs();
+
+                DataManager.uiLog('UI guardada');
+
+            });
+
+            document.getElementById('po-vip-export-csv').addEventListener('click', function () {
+
+                UIController.exportLossCSV();
+
+            });
+
+            document.getElementById('po-vip-run-backtest').addEventListener('click', function () {
+
+                UIController.runBacktest();
+
+            });
+
+        }
+
+        static applySavedPrefsToUi() {
+
+            const prefs = DataManager.loadPrefs();
+
+            if (prefs) {
+
+                if (typeof prefs.bot === 'boolean') BotState.config.BOT_RUNNING = prefs.bot;
+
+                if (typeof prefs.tg === 'boolean') BotState.config.TELEGRAM_ENABLED = prefs.tg;
+
+                if (typeof prefs.autoTrade === 'boolean') BotState.config.AUTOTRADE_ENABLED = prefs.autoTrade;
+
+                if (typeof prefs.multiPar === 'boolean') BotState.config.MULTI_PAR_ENABLED = prefs.multiPar;
+
+                if (typeof prefs.martingale === 'boolean') BotState.config.MARTINGALE_ENABLED = prefs.martingale;
+
+                if (typeof prefs.autoKill === 'boolean') BotState.config.AUTO_KILL_ENABLED = prefs.autoKill;
+
+                if (prefs.mode) BotState.config.OPERATION_MODE = prefs.mode;
+
+                if (prefs.minPayout) BotState.config.MIN_PAYOUT = prefs.minPayout;
+
+                if (prefs.minConf) BotState.config.MIN_CONFLUENCE_SCORE = prefs.minConf;
+
+                if (prefs.pull) BotState.config.PULLBACK_LEVEL = prefs.pull;
+
+                if (prefs.eng) BotState.config.ENGULF_LEVEL = prefs.eng;
+
+                if (prefs.enables) {
+
+                    for (const ek in prefs.enables) {
+
+                        if (prefs.enables.hasOwnProperty(ek)) {
+
+                            BotState.config[ek] = prefs.enables[ek];
+
+                        }
+
+                    }
+
+                }
+
+                if (prefs.positionSize) BotState.config.POSITION_SIZE_PERCENTAGE = prefs.positionSize;
+
+                if (prefs.maxDrawdown) BotState.config.MAX_DRAWDOWN_PERCENTAGE = prefs.maxDrawdown;
+
+            }
+
+            document.getElementById('po-vip-bot-toggle').classList.toggle('on', BotState.config.BOT_RUNNING);
+
+            document.getElementById('po-vip-tg-toggle').classList.toggle('on', BotState.config.TELEGRAM_ENABLED);
+
+            document.getElementById('po-vip-autokill-toggle').classList.toggle('on', BotState.config.AUTO_KILL_ENABLED);
+
+            document.getElementById('po-vip-autotrade-toggle').classList.toggle('on', BotState.config.AUTOTRADE_ENABLED);
+
+            document.getElementById('po-vip-multipar-toggle').classList.toggle('on', BotState.config.MULTI_PAR_ENABLED);
+
+            document.getElementById('po-vip-martingale-toggle').classList.toggle('on', BotState.config.MARTINGALE_ENABLED);
+
+            document.getElementById('po-vip-min-conf').value = BotState.config.MIN_CONFLUENCE_SCORE;
+
+            document.getElementById('po-vip-op-mode').value = BotState.config.OPERATION_MODE;
+
+            document.getElementById('po-vip-min-payout').value = BotState.config.MIN_PAYOUT;
+
+            document.getElementById('po-vip-pull-level').value = BotState.config.PULLBACK_LEVEL;
+
+            document.getElementById('po-vip-eng-level').value = BotState.config.ENGULF_LEVEL;
+
+            document.getElementById('po-status-badge').textContent = BotState.config.BOT_RUNNING ? '🟢 LIVE' : '🔴 OFF';
+
+            document.getElementById('po-status-badge').className = 'status-badge' + (BotState.config.BOT_RUNNING ? '' : ' off');
+
+            document.getElementById('po-vip-position-size').value = BotState.config.POSITION_SIZE_PERCENTAGE;
+
+            document.getElementById('po-vip-max-drawdown').value = BotState.config.MAX_DRAWDOWN_PERCENTAGE * 100;
+
+            const pills = document.querySelectorAll('#po-strats-pills .pill');
+
+            for (let i = 0; i < pills.length; i++) {
+
+                const key = pills[i].getAttribute('data-en');
+
+                pills[i].classList.toggle('active', !!BotState.config[key]);
+
+            }
+
+        }
+
+        static setAllPairsEnabled(on) {
+
+            for (const k in BotState.pairWatch) {
+
+                if (BotState.pairWatch.hasOwnProperty(k)) {
+
+                    BotState.pairWatch[k].enabled = on;
+
+                    BotState.pairWatch[k].paused = false;
+
+                }
+
+            }
+
+            DataManager.savePairStates();
+
+            UIController.renderPairList();
+
+        }
+
+        static renderPairList() {
+
+            const box = document.getElementById('po-vip-pairs');
+
+            if (!box) return;
+
+            const keys = Object.keys(BotState.pairWatch).sort();
+
+            if (!keys.length) {
+
+                box.innerHTML = '<span class="muted">Esperando ticks...</span>';
+
+                return;
+
+            }
+
+            let html = '';
+
+            for (let i = 0; i < keys.length; i++) {
+
+                const p = keys[i];
+
+                const en = BotState.pairWatch[p].enabled !== false;
+
+                const paused = BotState.pairWatch[p].paused === true;
+
+                const dead = BotState.deadZonePauseUntil[p] && Date.now() < BotState.deadZonePauseUntil[p];
+
+                const pay = BotState.pairPayouts[p] || 85;
+
+                const color = pay >= 85 ? '#4ade80' : pay >= 80 ? '#fbbf24' : '#f87171';
+
+                const cls = 'pair-card' + (en ? '' : ' off') + (paused || dead ? ' paused' : '');
+
+                html += '<div class="' + cls + '"><span style="cursor:pointer" data-toggle-pair="' + this.escapeAttr(p) + '">' +
+
+                       DataManager.formatPairDisplay(p) + ' <b style="color:' + color + '">' + pay + '%</b>' +
+
+                       (dead ? ' 💤' : '') + '</span></div>';
+
+            }
+
+            box.innerHTML = html;
+
+            box.querySelectorAll('[data-toggle-pair]').forEach(function (el) {
+
+                el.addEventListener('click', function () {
+
+                    const pair = this.getAttribute('data-toggle-pair');
+
+                    if (BotState.pairWatch[pair]) {
+
+                        if (BotState.pairWatch[pair].paused) {
+
+                            BotState.pairWatch[pair].paused = false;
+
+                            BotState.pairWatch[pair].enabled = true;
+
+                        } else {
+
+                            BotState.pairWatch[pair].enabled = !BotState.pairWatch[pair].enabled;
+
+                        }
+
+                        DataManager.savePairStates();
+
+                        UIController.renderPairList();
+
+                    }
+
+                });
+
+            });
+
+        }
+
+        static renderPanelLog() {
+
+            const el = document.getElementById('po-vip-log');
+
+            if (!el) return;
+
+            let html = '';
+
+            for (let i = 0; i < BotState.localLog.length; i++) {
+
+                const line = BotState.localLog[i];
+
+                let cls = '';
+
+                const msg = line.msg || line;
+
+                if (typeof line === 'object') {
+
+                    if (msg.indexOf('WIN') !== -1) cls = 'color:#4ade80;';
+
+                    else if (msg.indexOf('LOSS') !== -1) cls = 'color:#f87171;';
+
+                    else if (msg.indexOf('SEÑAL') !== -1) cls = 'color:#38bdf8;';
+
+                    html += '<div style="' + cls + '"><span style="color:#475569;">' + line.t + '</span> ' + msg + '</div>';
+
+                } else {
+
+                    html += '<div>' + line + '</div>';
+
+                }
+
+            }
+
+            el.innerHTML = html;
+
+            el.scrollTop = el.scrollHeight;
+
+        }
+
+        static countSessionWL() {
+
+            let w = 0;
+
+            let l = 0;
+
+            for (let i = 0; i < BotState.sessionLog.length; i++) {
+
+                if (BotState.sessionLog[i].win) w++;
+
+                else l++;
+
+            }
+
+            return { w: w, l: l, tot: w + l };
+
+        }
+
+        static refreshPanelLive() {
+
+            if (!BotState.panelReady) return;
+
+            const wl = this.countSessionWL();
+
+            document.getElementById('m-signals').textContent = wl.tot;
+
+            document.getElementById('m-wins').textContent = wl.w;
+
+            document.getElementById('m-losses').textContent = wl.l;
+
+            const wr = wl.tot ? Math.round((wl.w / wl.tot) * 100) : 0;
+
+            document.getElementById('m-wr').textContent = wr + '%';
+
+            document.getElementById('po-global-wr').textContent = 'WR ' + wr + '%';
+
+            const sigEl = document.getElementById('po-vip-signal');
+
+            if (BotState.lastSignalUI) {
+
+                sigEl.innerHTML = '<div style="font-weight:600;">' + BotState.lastSignalUI.pair + '</div>' +
+
+                                  '<div class="po-vip-dir" style="color:' +
+
+                                  (BotState.lastSignalUI.dir === 'CALL' ? '#4ade80' : '#f87171') + '">' +
+
+                                  BotState.lastSignalUI.dir + '</div>' +
+
+                                  '<div class="muted">' + BotState.lastSignalUI.motor + ' · ' + BotState.lastSignalUI.hm + '</div>';
+
+            } else {
+
+                sigEl.innerHTML = '<div class="muted">Sin señal activa</div>';
+
+            }
+
+            this.updateMotorStatsUI();
+
+            const atStatus = document.getElementById('po-autotrade-status');
+
+            if (atStatus) {
+
+                if (BotState.config.AUTOTRADE_ENABLED) {
+
+                    const visiblePair = DataManager.getVisiblePairFromUI();
+
+                    const modeText = BotState.config.MULTI_PAR_ENABLED ? ' (Multi)' : '';
+
+                    if (visiblePair) {
+
+                        atStatus.textContent = '🟢 ' + DataManager.formatPairDisplay(visiblePair) + modeText;
+
+                        atStatus.style.color = '#4ade80';
+
+                    } else {
+
+                        atStatus.textContent = '🟡 Esperando par' + modeText;
+
+                        atStatus.style.color = '#fbbf24';
+
+                    }
+
+                } else {
+
+                    atStatus.textContent = '';
+
+                }
+
+            }
+
+        }
+
+        static updateMotorStatsUI() {
+
+            const el = document.getElementById('po-vip-motor-stats');
+
+            if (!el) return;
+
+            const keys = Object.keys(BotState.statsByMotor).sort(function(a, b) {
+
+                return (BotState.statsByMotor[b].w + BotState.statsByMotor[b].wG1 + BotState.statsByMotor[b].l) -
+
+                       (BotState.statsByMotor[a].w + BotState.statsByMotor[a].wG1 + BotState.statsByMotor[a].l);
+
+            });
+
+            if (!keys.length) {
+
+                el.innerHTML = '<span class="muted">Sin datos</span>';
+
+                return;
+
+            }
+
+            let html = '';
+
+            for (let i = 0; i < keys.length; i++) {
+
+                const m = keys[i];
+
+                const s = BotState.statsByMotor[m];
+
+                const total = s.w + s.wG1 + s.l;
+
+                const wr = total ? Math.round(((s.w + s.wG1) / total) * 100) : 0;
+
+                const paused = BotState.motorPausedUntil[m] && Date.now() < BotState.motorPausedUntil[m];
+
+                const status = paused ? ' ⏸️' : '';
+
+                html += '<div class="motor-row"><span>' + m + ' (' + total + ')' + status + '</span><span style="color:#4ade80;">W' +
+
+                       (s.w + s.wG1) + '</span> <span style="color:#f87171;">L' + s.l + '</span> <span style="color:#fbbf24;">' + wr + '%</span></div>';
+
+            }
+
+            el.innerHTML = html;
+
+        }
+
+        static autoTop3() {
+
+            const motorNames = [
+
+                { key: 'ENABLE_BOLLINGER', name: 'Bollinger Bounce' },
+
+                { key: 'ENABLE_PINBAR', name: 'Pin Bar Rejection' },
+
+                { key: 'ENABLE_INSIDE_BAR', name: 'Inside Bar Break' },
+
+                { key: 'ENABLE_ALLIGATOR', name: 'Impulso Alligator' },
+
+                { key: 'ENABLE_GAP_FILL', name: 'Gap Fill' },
+
+                { key: 'ENABLE_PULLBACK', name: 'Pullback Fib' },
+
+                { key: 'ENABLE_ENGULFING', name: 'PA · Engulfing' },
+
+                { key: 'ENABLE_GAP', name: 'PA · Gap' },
+
+                { key: 'ENABLE_TRAP_WICK', name: 'Trap Wick Fade' },
+
+                { key: 'ENABLE_FALSE_BREAK', name: 'False Break Fade' }
+
+            ];
+
+            const valid = [];
+
+            for (let i = 0; i < motorNames.length; i++) {
+
+                const m = motorNames[i];
+
+                const stats = BotState.statsByMotor[m.name];
+
+                if (stats && (stats.w + stats.wG1 + stats.l) >= 5) {
+
+                    const wr = (stats.w + stats.wG1) / (stats.w + stats.wG1 + stats.l);
+
+                    valid.push({ key: m.key, wr: wr });
+
+                }
+
+            }
+
+            valid.sort(function(a, b) { return b.wr - a.wr; });
+
+            const top3Keys = valid.slice(0, 3).map(function(x) { return x.key; });
+
+            for (let j = 0; j < motorNames.length; j++) {
+
+                BotState.config[motorNames[j].key] = false;
+
+            }
+
+            for (let k = 0; k < top3Keys.length; k++) {
+
+                BotState.config[top3Keys[k]] = true;
+
+            }
+
+            DataManager.uiLog('⚡ Auto-Top 3: ' + top3Keys.join(', '));
+
+            DataManager.savePrefs();
+
+            UIController.applySavedPrefsToUi();
+
+        }
+
+        static exportLossCSV() {
+
+            if (BotState.lossLog.length === 0) {
+
+                DataManager.uiLog('No hay datos de pérdidas para exportar');
+
+                return;
+
+            }
+
+            let csvContent = "data:text/csv;charset=utf-8,";
+
+            csvContent += "Fecha,Hora,Par,Motor,Dirección,Apertura,Cierre,Máximo,Mínimo,Mecha Sup,Mecha Inf,Cuerpo,RSI,Payout,Ticks\n";
+
+            for (let i = 0; i < BotState.lossLog.length; i++) {
+
+                const l = BotState.lossLog[i];
+
+                const row = [
+
+                    l.date, l.time, l.pair, l.motor, l.dir,
+
+                    l.open, l.close, l.high, l.low,
+
+                    l.upperWick, l.lowerWick, l.body,
+
+                    l.rsi, l.payout, l.ticks
+
+                ].join(',');
+
+                csvContent += row + "\n";
+
+            }
+
+            const encodedUri = encodeURI(csvContent);
+
+            const link = document.createElement("a");
+
+            link.setAttribute("href", encodedUri);
+
+            link.setAttribute("download", "losses_" + new Date().toISOString().slice(0,10) + ".csv");
+
+            document.body.appendChild(link);
+
+            link.click();
+
+            document.body.removeChild(link);
+
+            DataManager.uiLog('📥 CSV exportado (' + BotState.lossLog.length + ' pérdidas)');
+
+        }
+
+        static escapeAttr(s) {
+
+            return String(s).replace(/&/g, '&amp;')
+
+                           .replace(/"/g, '&quot;')
+
+                           .replace(/</g, '&lt;')
+
+                           .replace(/>/g, '&gt;');
+
+        }
+
+        static runBacktest() {
+
+            DataManager.uiLog('Iniciando backtest...');
+
+            // Implementation would go here
+
+        }
+
+    }
+
+    // ==================== WEB SOCKET HANDLER ====================
+
+    function startWebSocketHandler() {
+
+        const OriginalWS = win.WebSocket;
+
+        win.WebSocket = function(url, protocols) {
+
+            const ws = protocols !== undefined ?
+
+                       new OriginalWS(url, protocols) :
+
+                       new OriginalWS(url);
+
+            ws.addEventListener('message', function(e) {
+
+                const d = e.data;
+
+                if (typeof d === 'string') {
+
+                    tryParseText(d);
+
+                } else if (typeof Blob !== 'undefined' && d instanceof Blob) {
+
+                    d.arrayBuffer().then(handleBinaryFrame).catch(function(){});
+
+                } else if (typeof ArrayBuffer !== 'undefined' && d instanceof ArrayBuffer) {
+
+                    handleBinaryFrame(d);
+
+                }
+
+            });
+
+            return ws;
+
+        };
+
+        win.WebSocket.prototype = OriginalWS.prototype;
+
+    }
+
+    function extractTicks(obj) {
+
+        if (obj == null) return;
+
+        if (Array.isArray(obj)) {
+
+            if (obj.length >= 3 && typeof obj[0] === 'string' && typeof obj[1] === 'number' && typeof obj[2] === 'number') {
+
+                DataManager.processTick(obj[0], obj[1], obj[2]);
+
+                return;
+
+            }
+
+            for (let i = 0; i < obj.length; i++) {
+
+                extractTicks(obj[i]);
+
+            }
+
+            return;
+
+        }
+
+        if (typeof obj !== 'object') return;
+
+        for (const key in obj) {
+
+            if (!obj.hasOwnProperty(key)) continue;
+
+            const val = obj[key];
+
+            if (val && typeof val === 'object' && !Array.isArray(val) && val.time != null && val.price != null) {
+
+                const t = Number(val.time);
+
+                const p = Number(val.price);
+
+                if (isFinite(t) && isFinite(p)) {
+
+                    DataManager.processTick(key, t, p);
+
+                }
+
+            } else if (val && typeof val === 'object') {
+
+                extractTicks(val);
+
+            }
+
+        }
+
+    }
+
+    function tryParseText(msg) {
+
+        if (typeof msg !== 'string') return;
+
+        const i = msg.search(/[\{\[]/);
+
+        if (i === -1) return;
+
+        try {
+
+            extractTicks(JSON.parse(msg.substring(i)));
+
+        } catch (e) {}
+
+    }
+
+    function handleBinaryFrame(buf) {
+
+        try {
+
+            const text = new TextDecoder('utf-8', { fatal: false }).decode(new Uint8Array(buf));
+
+            const j = text.search(/[\{\[]/);
+
+            if (j !== -1) {
+
+                try {
+
+                    extractTicks(JSON.parse(text.substring(j)));
+
+                } catch (e2) {}
+
+            }
+
+        } catch (e) {}
+
+    }
+
+    // ==================== INITIALIZATION ====================
+
+    function init() {
+
+        DataManager.initialize();
+
+        startWebSocketHandler();
+
+        UIController.ensurePanel();
+
+        DataManager.uiLog('Bot v5.9 PRO iniciado');
+
+    }
+
+    // Start the bot
+
+    init();
+
+})();
+
