@@ -1,0 +1,2087 @@
+// ==UserScript==
+
+// @name         Po-v5.8 Data-Driven Final
+
+// @description  v5.8 · Confluencia 1 + Filtros CSV + Motores reactivados + Payout fix
+
+// @author       xander
+
+// @match        https://pocketoption.com/*
+
+// @match        https://*.pocketoption.com/*
+
+// @match        https://*.po.trade/*
+
+// @match        https://*.po.market/*
+
+// @match        https://*.pocketoption.org/*
+
+// @run-at       document-start
+
+// @grant        GM_xmlhttpRequest
+
+// @grant        unsafeWindow
+
+// @connect      api.telegram.org
+
+// ==/UserScript==
+
+(function () {
+
+    'use strict';
+
+    const win = typeof unsafeWindow !== 'undefined' ? unsafeWindow : window;
+
+    var STORAGE_KEY = 'po_vip_panel_v58_final';
+
+    var PAIR_STATE_KEY = 'po_vip_pair_states';
+
+    // ==================== CONFIGURACIÓN ====================
+
+    var CONFIG = {
+
+        TELEGRAM_TOKEN: '8822818498:AAFmuBxNyRogaXYgT3MnOTVCTj8dwKfqgmw',
+
+        TELEGRAM_CHAT_ID: '-1004476929607',
+
+        EXPIRY_TIME_SEC: 60,
+
+        COOLDOWN_MINUTES_PER_PAIR: 2,
+
+        MAX_SIGNALS_SESSION: 300,
+
+        EVAL_SEC_START: 20,
+
+        EVAL_SEC_END: 50,
+
+        EVAL_BUCKETS: [20, 30, 40, 45, 50],
+
+        SUMMARY_EVERY_N: 20,
+
+        NOTIFY_FIRST_TICK: false,
+
+        NOTIFY_PAIR_OPEN: true,
+
+        MARTINGALE_ENABLED: true,
+
+        MARTINGALE_STEPS: 1,
+
+        DISPLAY_UTC_OFFSET_MIN: -60,
+
+        OPERATION_MODE: 'normal',
+
+        AUTOTRADE_ENABLED: false,
+
+        MULTI_PAR_ENABLED: false,
+
+        MIN_PAYOUT: 80,
+
+        MIN_CONFLUENCE_SCORE: 1,
+
+        MAX_SIGNALS_PER_HOUR: 100,
+
+        MAX_SIGNALS_PER_PAIR_HOUR: 10,
+
+        SWING_LOOKBACK: 15,
+
+        MA_PERIOD: 10,
+
+        MA_SLOPE_LOOKBACK: 3,
+
+        RSI_PERIOD: 14,
+
+        // Pullback más estricto (basado en CSV)
+
+        PULLBACK_LEVEL: 'weak',
+
+        PULLBACK_FIB_MODE: 'classic',
+
+        PULLBACK_RSI_CALL_MAX: 58,
+
+        PULLBACK_RSI_CALL_MIN: 0,
+
+        PULLBACK_RSI_PUT_MIN: 42,
+
+        PULLBACK_RSI_PUT_MAX: 100,
+
+        PULLBACK_FIB_LOW: 0.50,
+
+        PULLBACK_FIB_HIGH: 0.50,
+
+        PULLBACK_REJECT_WICK: 0.0003,
+
+        PULLBACK_CONFLUENCE_MIN: 1,
+
+        PULLBACK_IMPULSE_BARS: 0,
+
+        PULLBACK_REQUIRE_CANDLE_DIR: false,
+
+        PULLBACK_COOLDOWN_MIN: 2,
+
+        // Alligator (intacto)
+
+        ALLIGATOR_MIN_S15: 18,
+
+        ALLIGATOR_SCORE_BONUS: 1,
+
+        ALLIGATOR_DM_CALL: 60,
+
+        ALLIGATOR_DM_PUT: 40,
+
+        // Engulfing con bonus
+
+        ENGULF_LEVEL: 'normal',
+
+        PA_ENGULF_BODY_MULT: 1.10,
+
+        PA_ENGULF_MIN_BODY: 0.35,
+
+        PA_ENGULF_PREV_BODY_MIN: 0.18,
+
+        PA_ENGULF_RANGE_ATR_MULT: 0.85,
+
+        PA_ENGULF_CONFLUENCE_MIN: 1,
+
+        PA_ENGULF_REQUIRE_TREND: false,
+
+        PA_ENGULF_CLOSE_EXTREME: 0.55,
+
+        PA_ENGULF_SCORE_BONUS: 1,
+
+        // === MOTORES REACTIVADOS (parámetros relajados) ===
+
+        ENABLE_BOLLINGER: true,
+
+        ENABLE_PINBAR: true,
+
+        ENABLE_INSIDE_BAR: true,
+
+        ENABLE_ALLIGATOR: true,
+
+        ENABLE_GAP_FILL: true,
+
+        ENABLE_PULLBACK: true,
+
+        ENABLE_ENGULFING: true,
+
+        // Reactivados con parámetros más permisivos
+
+        ENABLE_GAP: true,
+
+        ENABLE_TRAP_WICK: true,
+
+        ENABLE_FALSE_BREAK: true,
+
+        ENABLE_STOCH_PULL: false,
+
+        STOCH_PERIOD: 5, STOCH_K: 3, STOCH_D: 3,
+
+        BB_PERIOD: 20, BB_STD: 1.7,
+
+        EMA_FAST: 5, EMA_SLOW: 20,
+
+        PA_GAP_MIN_PCT: 0.00005,
+
+        PA_PIN_TRAP_WICK: 0.45,
+
+        PA_MIN_BODY: 0.22,
+
+        BO_LOOKBACK: 7,
+
+        CHAOS_MULT: 3.0, DEAD_RATIO: 0.35, CHOP_LOOKBACK: 6,
+
+        CONFLUENCE_MIN: 1,
+
+        SR_PROXIMITY: 0.40,
+
+        // Filtros basados en CSV
+
+        MIN_TICKS_PER_CANDLE: 5,
+
+        MIN_PRICE_FILTER: 0.01,
+
+        RSI_DEAD_ZONE: 5,
+
+        SCORE_PENALTY_LOW_PAYOUT: 1,
+
+        MIN_PAYOUT_FOR_MARTINGALE: 85,
+
+        MOTOR_CONFIDENCE_WINDOW: 20,
+
+        MOTOR_MIN_WINRATE: 0.0,
+
+        DEAD_ZONE_PCT: 0.0002,
+
+        DEAD_ZONE_MINUTES: 3,
+
+        DEAD_ZONE_PAUSE_MINUTES: 5,
+
+        PAIR_DIVERSITY_WINDOW: 15,
+
+        PAIR_MAX_SHARE: 0.40,
+
+        AUTO_KILL_ENABLED: true,
+
+        AUTO_KILL_MIN_WR: 0.45,
+
+        AUTO_KILL_WINDOW: 10,
+
+        REPETITION_PAUSE_LIMIT: 2,
+
+        REPETITION_PAUSE_MINUTES: 5,
+
+        BOT_RUNNING: true,
+
+        TELEGRAM_ENABLED: true,
+
+        LOG_MAX_LINES: 80
+
+    };
+
+    // ==================== PRESETS ====================
+
+    var PULLBACK_PRESETS = {
+
+        weak: {
+
+            PULLBACK_FIB_MODE: 'classic',
+
+            PULLBACK_RSI_CALL_MIN: 0, PULLBACK_RSI_CALL_MAX: 58,
+
+            PULLBACK_RSI_PUT_MIN: 42, PULLBACK_RSI_PUT_MAX: 100,
+
+            PULLBACK_FIB_LOW: 0.50, PULLBACK_FIB_HIGH: 0.50,
+
+            PULLBACK_REJECT_WICK: 0.0003, PULLBACK_CONFLUENCE_MIN: 1,
+
+            PULLBACK_IMPULSE_BARS: 0, PULLBACK_REQUIRE_CANDLE_DIR: false,
+
+            PULLBACK_COOLDOWN_MIN: 2
+
+        },
+
+        normal: {
+
+            PULLBACK_FIB_MODE: 'zone',
+
+            PULLBACK_RSI_CALL_MIN: 20, PULLBACK_RSI_CALL_MAX: 55,
+
+            PULLBACK_RSI_PUT_MIN: 45, PULLBACK_RSI_PUT_MAX: 80,
+
+            PULLBACK_FIB_LOW: 0.45, PULLBACK_FIB_HIGH: 0.65,
+
+            PULLBACK_REJECT_WICK: 0.0003, PULLBACK_CONFLUENCE_MIN: 1,
+
+            PULLBACK_IMPULSE_BARS: 0, PULLBACK_REQUIRE_CANDLE_DIR: false,
+
+            PULLBACK_COOLDOWN_MIN: 2
+
+        },
+
+        pro: {
+
+            PULLBACK_FIB_MODE: 'zone',
+
+            PULLBACK_RSI_CALL_MIN: 28, PULLBACK_RSI_CALL_MAX: 48,
+
+            PULLBACK_RSI_PUT_MIN: 52, PULLBACK_RSI_PUT_MAX: 72,
+
+            PULLBACK_FIB_LOW: 0.50, PULLBACK_FIB_HIGH: 0.618,
+
+            PULLBACK_REJECT_WICK: 0.0005, PULLBACK_CONFLUENCE_MIN: 2,
+
+            PULLBACK_IMPULSE_BARS: 1, PULLBACK_REQUIRE_CANDLE_DIR: true,
+
+            PULLBACK_COOLDOWN_MIN: 4
+
+        }
+
+    };
+
+    var ENGULF_PRESETS = {
+
+        pro: { PA_ENGULF_BODY_MULT: 1.35, PA_ENGULF_MIN_BODY: 0.42, PA_ENGULF_PREV_BODY_MIN: 0.25, PA_ENGULF_RANGE_ATR_MULT: 1.05, PA_ENGULF_CONFLUENCE_MIN: 2, PA_ENGULF_REQUIRE_TREND: true, PA_ENGULF_CLOSE_EXTREME: 0.65 },
+
+        normal: { PA_ENGULF_BODY_MULT: 1.10, PA_ENGULF_MIN_BODY: 0.35, PA_ENGULF_PREV_BODY_MIN: 0.18, PA_ENGULF_RANGE_ATR_MULT: 0.85, PA_ENGULF_CONFLUENCE_MIN: 1, PA_ENGULF_REQUIRE_TREND: false, PA_ENGULF_CLOSE_EXTREME: 0.55 },
+
+        weak: { PA_ENGULF_BODY_MULT: 1.05, PA_ENGULF_MIN_BODY: 0.30, PA_ENGULF_PREV_BODY_MIN: 0.12, PA_ENGULF_RANGE_ATR_MULT: 0.70, PA_ENGULF_CONFLUENCE_MIN: 1, PA_ENGULF_REQUIRE_TREND: false, PA_ENGULF_CLOSE_EXTREME: 0.50 }
+
+    };
+
+    function applyPullbackLevel(level) {
+
+        level = String(level || 'weak').toLowerCase();
+
+        if (!PULLBACK_PRESETS[level]) level = 'weak';
+
+        CONFIG.PULLBACK_LEVEL = level;
+
+        var p = PULLBACK_PRESETS[level], k;
+
+        for (k in p) if (Object.prototype.hasOwnProperty.call(p, k)) CONFIG[k] = p[k];
+
+    }
+
+    function applyEngulfLevel(level) {
+
+        level = String(level || 'normal').toLowerCase();
+
+        if (!ENGULF_PRESETS[level]) level = 'normal';
+
+        CONFIG.ENGULF_LEVEL = level;
+
+        var p = ENGULF_PRESETS[level], k;
+
+        for (k in p) if (Object.prototype.hasOwnProperty.call(p, k)) CONFIG[k] = p[k];
+
+    }
+
+    applyPullbackLevel(CONFIG.PULLBACK_LEVEL);
+
+    applyEngulfLevel(CONFIG.ENGULF_LEVEL);
+
+    // ==================== ESTADO ====================
+
+    var pendingTrades = {}, activeTrades = {}, tradeHistory = [], sessionLog = [];
+
+    var candleState = {}, history = {}, signalsToday = 0;
+
+    var cyclesToday = 0;
+
+    var lastSignalMinuteByPair = {}, lastPullbackMinuteByPair = {};
+
+    var firstTickSent = {}, lastEvalBucket = {}, statsByMotor = {};
+
+    var scriptBoot = false, pairWatch = {}, localLog = [];
+
+    var lastSignalUI = null, panelReady = false, panelMinimized = false;
+
+    var pairPayouts = {};
+
+    var signalsThisHour = 0, signalsPerPairHour = {}, lastHourReset = Math.floor(Date.now() / 3600000);
+
+    var serverTimeOffset = 0, lastTickTime = 0, inactivityTimer = null;
+
+    var tickCountByPair = {};
+
+    var motorRecentResults = {};
+
+    var deadZonePauseUntil = {};
+
+    var pairRecentSignals = {};
+
+    var motorConsecutiveCount = {};
+
+    var motorPausedUntil = {};
+
+    var lastMotorUsed = '';
+
+    var lossLog = [];
+
+    // ==================== PREFS ====================
+
+    function loadPrefs() {
+
+        try { var raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : null; } catch (e) { return null; }
+
+    }
+
+    function savePrefs() {
+
+        try {
+
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({
+
+                bot: CONFIG.BOT_RUNNING,
+
+                tg: CONFIG.TELEGRAM_ENABLED,
+
+                mode: CONFIG.OPERATION_MODE,
+
+                autoTrade: CONFIG.AUTOTRADE_ENABLED,
+
+                multiPar: CONFIG.MULTI_PAR_ENABLED,
+
+                martingale: CONFIG.MARTINGALE_ENABLED,
+
+                autoKill: CONFIG.AUTO_KILL_ENABLED,
+
+                minPayout: CONFIG.MIN_PAYOUT,
+
+                minConf: CONFIG.MIN_CONFLUENCE_SCORE,
+
+                pull: CONFIG.PULLBACK_LEVEL,
+
+                eng: CONFIG.ENGULF_LEVEL,
+
+                enables: {
+
+                    ENABLE_BOLLINGER: CONFIG.ENABLE_BOLLINGER,
+
+                    ENABLE_PINBAR: CONFIG.ENABLE_PINBAR,
+
+                    ENABLE_INSIDE_BAR: CONFIG.ENABLE_INSIDE_BAR,
+
+                    ENABLE_ALLIGATOR: CONFIG.ENABLE_ALLIGATOR,
+
+                    ENABLE_GAP_FILL: CONFIG.ENABLE_GAP_FILL,
+
+                    ENABLE_PULLBACK: CONFIG.ENABLE_PULLBACK,
+
+                    ENABLE_ENGULFING: CONFIG.ENABLE_ENGULFING,
+
+                    ENABLE_GAP: CONFIG.ENABLE_GAP,
+
+                    ENABLE_TRAP_WICK: CONFIG.ENABLE_TRAP_WICK,
+
+                    ENABLE_FALSE_BREAK: CONFIG.ENABLE_FALSE_BREAK,
+
+                    ENABLE_STOCH_PULL: CONFIG.ENABLE_STOCH_PULL
+
+                }
+
+            }));
+
+            savePairStates();
+
+        } catch (e) {}
+
+    }
+
+    function savePairStates() {
+
+        try {
+
+            var states = {};
+
+            for (var k in pairWatch) if (pairWatch.hasOwnProperty(k)) states[k] = { enabled: pairWatch[k].enabled, paused: pairWatch[k].paused };
+
+            localStorage.setItem(PAIR_STATE_KEY, JSON.stringify(states));
+
+        } catch (e) {}
+
+    }
+
+    function loadPairStates() {
+
+        try { return JSON.parse(localStorage.getItem(PAIR_STATE_KEY) || '{}'); } catch (e) { return {}; }
+
+    }
+
+    // ==================== TELEGRAM + LOG ====================
+
+    function uiLog(msg) {
+
+        var t = getDisplayTime(Math.floor(Date.now() / 1000)).hms;
+
+        localLog.push({ t: t, msg: msg });
+
+        if (localLog.length > CONFIG.LOG_MAX_LINES) localLog.shift();
+
+        try { console.log('[VIP]', msg); } catch (e) {}
+
+        renderPanelLog();
+
+    }
+
+    function sendTelegramMessage(text) {
+
+        if (!CONFIG.TELEGRAM_ENABLED) return;
+
+        try {
+
+            GM_xmlhttpRequest({
+
+                method: 'POST',
+
+                url: 'https://api.telegram.org/bot' + CONFIG.TELEGRAM_TOKEN + '/sendMessage',
+
+                headers: { 'Content-Type': 'application/json' },
+
+                data: JSON.stringify({ chat_id: CONFIG.TELEGRAM_CHAT_ID, text: text, parse_mode: 'HTML' }),
+
+                onerror: function () { uiLog('TG error'); }
+
+            });
+
+        } catch (e) {}
+
+    }
+
+    function bootOnce() {
+
+        if (scriptBoot) return;
+
+        scriptBoot = true;
+
+        sendTelegramMessage('💎 LIVE VIP 5.8 Data‑Driven Final\nFiltros CSV + Motores reactivados');
+
+        uiLog('Bot + Panel Glass v5.8 cargado');
+
+        ensurePanel();
+
+    }
+
+    // ==================== TIEMPO / PARES ====================
+
+    function getAdjustedTime() { return Math.floor(Date.now() / 1000) + serverTimeOffset; }
+
+    function getDisplayTime(ts) {
+
+        var d = new Date(ts * 1000), utc = d.getTime() + d.getTimezoneOffset() * 60000, nd = new Date(utc + CONFIG.DISPLAY_UTC_OFFSET_MIN * 60000);
+
+        function z(n) { return String(n).padStart(2, '0'); }
+
+        return { hm: z(nd.getHours()) + ':' + z(nd.getMinutes()), hms: z(nd.getHours()) + ':' + z(nd.getMinutes()) + ':' + z(nd.getSeconds()), dateDM: z(nd.getDate()) + '/' + z(nd.getMonth() + 1) };
+
+    }
+
+    function normalizePairFromTick(pair) { return String(pair).toUpperCase().replace(/_OTC/gi, ' OTC').replace(/_/g, ' ').replace(/\s+/g, ' ').trim(); }
+
+    function formatPairDisplay(pair) {
+
+        var s = normalizePairFromTick(pair), otc = /OTC/i.test(s);
+
+        var m = s.match(/^([A-Z]{3})\s*([A-Z]{3})/i);
+
+        if (m) return m[1] + '/' + m[2] + (otc ? ' OTC' : '');
+
+        m = s.match(/^([A-Z]{6})/i);
+
+        if (m) return m[1].slice(0, 3) + '/' + m[1].slice(3, 6) + (otc ? ' OTC' : '');
+
+        return s;
+
+    }
+
+    function escAttr(s) { return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+    function isPairEnabled(pairLabel) {
+
+        if (deadZonePauseUntil[pairLabel] && Date.now() < deadZonePauseUntil[pairLabel]) return false;
+
+        if (!pairWatch[pairLabel]) return true;
+
+        return pairWatch[pairLabel].enabled !== false && pairWatch[pairLabel].paused !== true;
+
+    }
+
+    function registerPair(pairLabel) {
+
+        if (!pairWatch[pairLabel]) {
+
+            var saved = loadPairStates(), enabled = true, paused = false;
+
+            if (saved[pairLabel]) { enabled = saved[pairLabel].enabled !== false; paused = saved[pairLabel].paused === true; }
+
+            pairWatch[pairLabel] = { enabled: enabled, paused: paused, ticks: 0 };
+
+            uiLog('Par detectado: ' + formatPairDisplay(pairLabel));
+
+            renderPairList();
+
+        }
+
+        pairWatch[pairLabel].ticks += 1;
+
+    }
+
+    function removePairFromWatch(pairLabel) {
+
+        delete history[pairLabel]; delete candleState[pairLabel]; delete lastEvalBucket[pairLabel];
+
+        delete lastSignalMinuteByPair[pairLabel]; delete lastPullbackMinuteByPair[pairLabel]; delete firstTickSent[pairLabel];
+
+        if (pendingTrades[pairLabel] && !activeTrades[pairLabel]) delete pendingTrades[pairLabel];
+
+        delete pairWatch[pairLabel]; delete pairPayouts[pairLabel]; delete pairRecentSignals[pairLabel]; savePairStates(); renderPairList();
+
+    }
+
+    function updatePayoutFromDOM() {
+
+        try {
+
+            var items = document.querySelectorAll('.assets-favorites-item');
+
+            for (var i = 0; i < items.length; i++) {
+
+                var item = items[i];
+
+                var labelEl = item.querySelector('.assets-favorites-item__label');
+
+                if (!labelEl) continue;
+
+                var pairName = (labelEl.textContent || '').trim();
+
+                if (pairName.length < 6) continue;
+
+                var pairLabel = normalizePairFromTick(pairName);
+
+                var payoutEl = item.querySelector('.payout__in') || item.querySelector('.payout');
+
+                if (payoutEl) {
+
+                    var txt = (payoutEl.textContent || '').trim();
+
+                    var m = txt.match(/\+(\d+)%?/);
+
+                    if (m) {
+
+                        var pct = parseInt(m[1], 10);
+
+                        if (pct >= 50 && pct <= 95) {
+
+                            pairPayouts[pairLabel] = pct;
+
+                        }
+
+                    }
+
+                }
+
+            }
+
+            renderPairList();
+
+        } catch(e) {}
+
+    }
+
+    setInterval(updatePayoutFromDOM, 3000);
+
+    function resetInactivityTimer() {
+
+        lastTickTime = Date.now();
+
+        if (inactivityTimer) clearTimeout(inactivityTimer);
+
+        inactivityTimer = setTimeout(function() {
+
+            if (CONFIG.BOT_RUNNING && Date.now() - lastTickTime > 120000) {
+
+                CONFIG.BOT_RUNNING = false;
+
+                uiLog('⚠️ Bot pausado por inactividad (2 min sin ticks)');
+
+                refreshPanelLive(); savePrefs();
+
+                sendTelegramMessage('⚠️ Bot pausado automáticamente por inactividad (>2 min sin datos)');
+
+            }
+
+        }, 120000);
+
+    }
+
+    function recordPairSignal(pairLabel) {
+
+        if (!pairRecentSignals[pairLabel]) pairRecentSignals[pairLabel] = [];
+
+        pairRecentSignals[pairLabel].push(Date.now());
+
+        var cutoff = Date.now() - CONFIG.PAIR_DIVERSITY_WINDOW * 60000;
+
+        while (pairRecentSignals[pairLabel].length && pairRecentSignals[pairLabel][0] < cutoff) pairRecentSignals[pairLabel].shift();
+
+    }
+
+    function getPairShare(pairLabel) {
+
+        if (!pairRecentSignals[pairLabel]) return 0;
+
+        var cutoff = Date.now() - CONFIG.PAIR_DIVERSITY_WINDOW * 60000;
+
+        var recent = pairRecentSignals[pairLabel].filter(ts => ts >= cutoff);
+
+        pairRecentSignals[pairLabel] = recent;
+
+        var total = 0;
+
+        for (var p in pairRecentSignals) {
+
+            if (pairRecentSignals.hasOwnProperty(p)) {
+
+                var valid = pairRecentSignals[p].filter(ts => ts >= cutoff);
+
+                total += valid.length;
+
+            }
+
+        }
+
+        if (total === 0) return 0;
+
+        return recent.length / total;
+
+    }
+
+    // ==================== CAMBIO DE PAR ====================
+
+    function switchToFavoritePair(targetPairLabel) {
+
+        var targetNormalized = normalizePairFromTick(targetPairLabel).toUpperCase().replace(/\s+/g, '').replace(/OTC/g, '').replace(/\//g, '');
+
+        var labels = document.querySelectorAll('.assets-favorites-item__label');
+
+        for (var i = 0; i < labels.length; i++) {
+
+            var label = labels[i];
+
+            var txt = (label.textContent || '').trim().toUpperCase().replace(/\s+/g, '').replace(/OTC/g, '').replace(/\//g, '');
+
+            if (txt === targetNormalized) {
+
+                var item = label.closest('.assets-favorites-item');
+
+                if (item && typeof item.click === 'function') {
+
+                    item.click();
+
+                    return true;
+
+                }
+
+            }
+
+        }
+
+        var alistItems = document.querySelectorAll('.alist__item');
+
+        for (var j = 0; j < alistItems.length; j++) {
+
+            var alistText = (alistItems[j].textContent || '').trim().toUpperCase().replace(/\s+/g, '').replace(/OTC/g, '').replace(/\//g, '');
+
+            if (alistText.indexOf(targetNormalized) !== -1) {
+
+                alistItems[j].click();
+
+                return true;
+
+            }
+
+        }
+
+        return false;
+
+    }
+
+    // ==================== AUTO‑TRADE ====================
+
+    function getVisiblePairFromUI() {
+
+        var selectors = [
+
+            '[class*="current-symbol"]',
+
+            '[class*="currentSymbol"]',
+
+            '[class*="pair-name"]',
+
+            '[class*="asset-name"]',
+
+            '[class*="symbol-name"]',
+
+            '.pair',
+
+            '[data-symbol]'
+
+        ];
+
+        for (var i = 0; i < selectors.length; i++) {
+
+            var el = document.querySelector(selectors[i]);
+
+            if (el) {
+
+                var txt = (el.getAttribute('data-symbol') || el.textContent || '').trim();
+
+                if (txt.length >= 6) {
+
+                    return txt.toUpperCase().replace(/\s+/g, '').replace(/OTC/g, '').replace(/\//g, '');
+
+                }
+
+            }
+
+        }
+
+        return '';
+
+    }
+
+    function autoClickButton(direction, doubleClick) {
+
+        if (!CONFIG.AUTOTRADE_ENABLED) return false;
+
+        var items = document.querySelectorAll('.switch-state-block__item');
+
+        if (items.length >= 2) {
+
+            var btn = direction === 'CALL' ? items[0] : items[1];
+
+            if (btn && typeof btn.click === 'function') {
+
+                btn.click();
+
+                if (doubleClick) { setTimeout(function() { btn.click(); }, 80); }
+
+                return true;
+
+            }
+
+        }
+
+        var todos = document.querySelectorAll('button, [role="button"], div');
+
+        for (var i = 0; i < todos.length; i++) {
+
+            var rect = todos[i].getBoundingClientRect();
+
+            if (rect.width > 80 && rect.height > 30 && rect.top > window.innerHeight * 0.4) {
+
+                if ((direction === 'CALL' && rect.left < window.innerWidth / 2) ||
+
+                    (direction === 'PUT' && rect.left > window.innerWidth / 2)) {
+
+                    todos[i].click();
+
+                    if (doubleClick) { setTimeout(function() { todos[i].click(); }, 80); }
+
+                    return true;
+
+                }
+
+            }
+
+        }
+
+        return false;
+
+    }
+
+    // ==================== PANEL UI v5.8 HUB ====================
+
+    function ensurePanel() {
+
+        if (panelReady) return;
+
+        if (!document.body && !document.documentElement) { setTimeout(ensurePanel, 300); return; }
+
+        injectPanelStyles();
+
+        injectPanelDom();
+
+        bindPanelEvents();
+
+        applySavedPrefsToUi();
+
+        panelReady = true;
+
+        setInterval(refreshPanelLive, 1000);
+
+        refreshPanelLive();
+
+        uiLog('Panel Glass HUB v5.8 listo');
+
+    }
+
+    function injectPanelStyles() {
+
+        if (document.getElementById('po-vip-panel-css')) return;
+
+        var css = document.createElement('style'); css.id = 'po-vip-panel-css';
+
+        css.textContent = `#po-vip-panel{position:fixed;top:40px;right:10px;width:380px;max-height:520px;z-index:2147483646;font-family:'Inter',system-ui,sans-serif;color:#e2e8f0;border-radius:14px;background:rgba(11,15,25,0.85);backdrop-filter:blur(25px);-webkit-backdrop-filter:blur(25px);border:1px solid rgba(255,255,255,0.08);box-shadow:0 20px 40px -10px rgba(0,0,0,0.7);overflow:hidden;user-select:none;display:flex;flex-direction:column}#po-vip-panel.minimized .po-vip-tabs,#po-vip-panel.minimized .po-vip-body{display:none}.po-vip-topbar{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:rgba(255,255,255,0.03);border-bottom:1px solid rgba(255,255,255,0.06);font-size:11px}.po-vip-tabs{display:flex;border-bottom:1px solid rgba(255,255,255,0.06)}.po-vip-tab{flex:1;text-align:center;padding:7px 0;font-size:10px;cursor:pointer;color:#64748b;transition:0.2s}.po-vip-tab.active{color:#38bdf8;border-bottom:2px solid #38bdf8;background:rgba(56,189,248,0.05)}.po-vip-body{flex:1;overflow-y:auto;padding:10px 12px;max-height:400px}.po-vip-body::-webkit-scrollbar{width:3px}.po-vip-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:3px}.status-badge{font-size:9px;padding:2px 8px;border-radius:20px;font-weight:600;background:rgba(34,197,94,0.15);color:#4ade80;border:1px solid rgba(34,197,94,0.3)}.status-badge.off{background:rgba(239,68,68,0.15);color:#f87171;border-color:rgba(239,68,68,0.3)}.po-vip-btn{background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#cbd5e1;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:9px;transition:all 0.15s}.po-vip-btn:hover{background:rgba(255,255,255,0.1);border-color:rgba(255,255,255,0.2);color:#fff}.toggle-switch{position:relative;width:36px;height:18px;background:rgba(255,255,255,0.15);border-radius:18px;cursor:pointer;transition:0.25s;border:1px solid rgba(255,255,255,0.08)}.toggle-switch.on{background:#22c55e;border-color:#22c55e}.toggle-switch::after{content:'';position:absolute;top:1px;left:1px;width:14px;height:14px;background:#fff;border-radius:50%;transition:0.25s}.toggle-switch.on::after{left:19px}.metric-card{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.05);border-radius:10px;padding:8px 4px;text-align:center}.metric-value{font-size:16px;font-weight:700}.po-vip-signal{padding:10px;border-radius:12px;margin:6px 0;text-align:center;background:rgba(0,0,0,0.2);border:1px solid rgba(255,255,255,0.06)}.po-vip-signal.call{border-color:#22c55e;box-shadow:0 0 12px rgba(34,197,94,0.1)}.po-vip-signal.put{border-color:#f87171;box-shadow:0 0 12px rgba(248,113,113,0.1)}.po-vip-dir{font-size:18px;font-weight:800}.pills-grid{display:flex;flex-wrap:wrap;gap:5px}.pill{padding:4px 8px;border-radius:16px;font-size:9px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);color:#94a3b8;cursor:pointer;transition:0.2s}.pill.active{background:rgba(56,189,248,0.15);border-color:#38bdf8;color:#7dd3fc}.pair-grid{display:flex;flex-wrap:wrap;gap:5px;max-height:180px;overflow-y:auto}.pair-card{display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:6px;padding:3px 7px;font-size:9px}.pair-card.off{opacity:0.4}.po-vip-log{background:#0a0e17;border:1px solid rgba(255,255,255,0.05);border-radius:8px;padding:6px 8px;height:120px;overflow-y:auto;font-family:'JetBrains Mono',monospace;font-size:9px;color:#94a3b8}select.po-vip-sel,input.po-vip-inp{background:rgba(0,0,0,0.4);color:#e2e8f0;border:1px solid rgba(255,255,255,0.1);border-radius:6px;padding:3px 6px;font-size:9px}.motor-row{display:flex;justify-content:space-between;align-items:center;margin:3px 0;font-size:10px}.tab-content{display:none}.tab-content.active{display:block}`;
+
+        (document.head || document.documentElement).appendChild(css);
+
+    }
+
+    function injectPanelDom() {
+
+        if (document.getElementById('po-vip-panel')) return;
+
+        var root = document.createElement('div'); root.id = 'po-vip-panel';
+
+        root.innerHTML = `<div class="po-vip-topbar" id="po-vip-drag"><span style="font-weight:700;font-size:12px;">💎 VIP GLASS HUB v5.8</span><span class="status-badge" id="po-status-badge">🟢 LIVE</span><span id="po-global-wr" style="font-size:10px;color:#fbbf24;margin-left:8px;"></span><span id="po-autotrade-status" style="font-size:10px;color:#38bdf8;margin-left:8px;"></span><button class="po-vip-btn" id="po-vip-min">—</button></div><div class="po-vip-tabs"><div class="po-vip-tab active" data-tab="dashboard">📊 Dashboard</div><div class="po-vip-tab" data-tab="strategies">🧠 Estrategias</div><div class="po-vip-tab" data-tab="pairs">🌐 Pares</div><div class="po-vip-tab" data-tab="settings">⚙️ Ajustes</div></div><div class="po-vip-body"><div id="tab-dashboard" class="tab-content active"><div id="po-vip-signal" class="po-vip-signal"><div class="muted">Sin señal activa</div></div><div style="display:flex;gap:6px;margin:8px 0;"><div class="metric-card"><div class="muted" style="font-size:8px;">Señales</div><div class="metric-value" id="m-signals">0</div></div><div class="metric-card"><div class="muted" style="font-size:8px;">Wins</div><div class="metric-value" style="color:#4ade80;" id="m-wins">0</div></div><div class="metric-card"><div class="muted" style="font-size:8px;">Losses</div><div class="metric-value" style="color:#f87171;" id="m-losses">0</div></div><div class="metric-card"><div class="muted" style="font-size:8px;">WR</div><div class="metric-value" style="color:#38bdf8;" id="m-wr">0%</div></div></div><h4 style="margin:8px 0 4px;font-size:10px;color:#64748b;">Terminal</h4><div class="po-vip-log" id="po-vip-log"></div></div><div id="tab-strategies" class="tab-content"><h4 style="margin:4px 0;font-size:10px;color:#64748b;">Toggles</h4><div class="pills-grid" id="po-strats-pills"><div class="pill active" data-en="ENABLE_BOLLINGER">Bollinger</div><div class="pill active" data-en="ENABLE_PINBAR">Pin Bar</div><div class="pill active" data-en="ENABLE_INSIDE_BAR">Inside Bar</div><div class="pill active" data-en="ENABLE_ALLIGATOR">Alligator</div><div class="pill active" data-en="ENABLE_GAP_FILL">Gap Fill</div><div class="pill active" data-en="ENABLE_PULLBACK">Pullback</div><div class="pill active" data-en="ENABLE_ENGULFING">Engulfing</div><div class="pill active" data-en="ENABLE_GAP">Gap</div><div class="pill active" data-en="ENABLE_TRAP_WICK">Trap</div><div class="pill active" data-en="ENABLE_FALSE_BREAK">F.Break</div></div><h4 style="margin:8px 0 4px;font-size:10px;color:#64748b;">Niveles</h4><div class="row"><span style="font-size:10px;">Pullback</span><select class="po-vip-sel" id="po-vip-pull-level"><option value="weak" selected>Débil</option><option value="normal">Normal</option><option value="pro">Pro</option></select></div><div class="row" style="margin-top:4px;"><span style="font-size:10px;">Engulfing</span><select class="po-vip-sel" id="po-vip-eng-level"><option value="weak">Débil</option><option value="normal" selected>Normal</option><option value="pro">Pro</option></select></div><button class="po-vip-btn" id="po-vip-auto-top3" style="margin:8px 0;width:100%;">⚡ Auto-Top 3</button><h4 style="margin:4px 0;font-size:10px;color:#64748b;">Rendimiento por motor</h4><div id="po-vip-motor-stats"><span class="muted">Sin datos</span></div></div><div id="tab-pairs" class="tab-content"><div class="pair-grid" id="po-vip-pairs"><span class="muted">Esperando ticks…</span></div><div style="margin-top:8px;display:flex;gap:6px;"><button class="po-vip-btn" id="po-vip-pairs-all">Todos ON</button><button class="po-vip-btn" id="po-vip-pairs-none">Todos OFF</button></div></div><div id="tab-settings" class="tab-content"><div class="row"><span style="font-size:10px;">Modo</span><select class="po-vip-sel" id="po-vip-op-mode"><option value="normal" selected>Normal</option><option value="test">Prueba</option></select></div><div class="row"><span style="font-size:10px;">🤖 AutoTrade DEMO</span><div class="toggle-switch" id="po-vip-autotrade-toggle"></div></div><div class="row"><span style="font-size:10px;">🌐 Multi‑Par (Favoritos)</span><div class="toggle-switch" id="po-vip-multipar-toggle"></div></div><div class="row"><span style="font-size:10px;">🔂 Martingala (Gale)</span><div class="toggle-switch on" id="po-vip-martingale-toggle"></div></div><div class="row"><span style="font-size:10px;">📊 Confluencia mín</span><select class="po-vip-sel" id="po-vip-min-conf"><option value="1" selected>1 (Normal)</option><option value="2">2 (Alta)</option><option value="3">3 (Ultra‑Estricta)</option></select></div><div class="row"><span style="font-size:10px;">Payout Mín</span><input class="po-vip-inp" id="po-vip-min-payout" value="80" style="width:50px;"></div><div class="row"><span style="font-size:10px;">Bot Engine</span><div class="toggle-switch on" id="po-vip-bot-toggle"></div></div><div class="row"><span style="font-size:10px;">Telegram</span><div class="toggle-switch on" id="po-vip-tg-toggle"></div></div><div class="row"><span style="font-size:10px;">Auto-Kill</span><div class="toggle-switch on" id="po-vip-autokill-toggle"></div></div><div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;"><button class="po-vip-btn" id="po-vip-summary">📋 Resumen TG</button><button class="po-vip-btn" id="po-vip-log-clear">🗑️ Clear</button><button class="po-vip-btn" id="po-vip-save">💾 Save</button><button class="po-vip-btn" id="po-vip-export-csv">📥 Exportar CSV</button></div></div></div>`;
+
+        (document.body || document.documentElement).appendChild(root);
+
+        makeDraggable(root, document.getElementById('po-vip-drag'));
+
+    }
+
+    function makeDraggable(panel, handle) {
+
+        var dragging = false, ox = 0, oy = 0;
+
+        handle.addEventListener('mousedown', function (e) {
+
+            if (e.button !== 0 || e.target.closest('.po-vip-log, .po-vip-pairs, .pills-grid')) return;
+
+            dragging = true; var r = panel.getBoundingClientRect(); ox = e.clientX - r.left; oy = e.clientY - r.top;
+
+            panel.style.right = 'auto'; panel.style.left = r.left + 'px'; panel.style.top = r.top + 'px'; e.preventDefault();
+
+        });
+
+        window.addEventListener('mousemove', function (e) {
+
+            if (!dragging) return;
+
+            panel.style.left = Math.min(window.innerWidth - 48, Math.max(0, e.clientX - ox)) + 'px';
+
+            panel.style.top = Math.min(window.innerHeight - 40, Math.max(0, e.clientY - oy)) + 'px';
+
+        });
+
+        window.addEventListener('mouseup', function () { if (dragging) { dragging = false; savePrefs(); } });
+
+    }
+
+    function updateMotorStatsUI() {
+
+        var el = document.getElementById('po-vip-motor-stats'); if (!el) return;
+
+        var keys = Object.keys(statsByMotor).sort(function(a,b) { return (statsByMotor[b].w+statsByMotor[b].wG1+statsByMotor[b].l) - (statsByMotor[a].w+statsByMotor[a].wG1+statsByMotor[a].l); });
+
+        if (!keys.length) { el.innerHTML = '<span class="muted">Sin datos</span>'; return; }
+
+        var html = '';
+
+        for (var i = 0; i < keys.length; i++) {
+
+            var m = keys[i], s = statsByMotor[m], total = s.w+s.wG1+s.l, wr = total ? Math.round(((s.w+s.wG1)/total)*100) : 0;
+
+            var paused = motorPausedUntil[m] && Date.now() < motorPausedUntil[m];
+
+            var status = paused ? ' ⏸️' : '';
+
+            html += '<div class="motor-row"><span>' + m + ' (' + total + ')' + status + '</span><span style="color:#4ade80;">W' + (s.w+s.wG1) + '</span> <span style="color:#f87171;">L' + s.l + '</span> <span style="color:#fbbf24;">' + wr + '%</span></div>';
+
+        }
+
+        el.innerHTML = html;
+
+    }
+
+    function bindPanelEvents() {
+
+        document.querySelectorAll('.po-vip-tab').forEach(function(tab) {
+
+            tab.addEventListener('click', function() {
+
+                document.querySelectorAll('.po-vip-tab').forEach(t => t.classList.remove('active'));
+
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+                this.classList.add('active');
+
+                document.getElementById('tab-' + this.dataset.tab).classList.add('active');
+
+            });
+
+        });
+
+        document.getElementById('po-vip-min').addEventListener('click', function () {
+
+            panelMinimized = !panelMinimized;
+
+            document.getElementById('po-vip-panel').classList.toggle('minimized', panelMinimized);
+
+        });
+
+        document.getElementById('po-vip-bot-toggle').addEventListener('click', function () {
+
+            CONFIG.BOT_RUNNING = !CONFIG.BOT_RUNNING;
+
+            this.classList.toggle('on', CONFIG.BOT_RUNNING);
+
+            document.getElementById('po-status-badge').textContent = CONFIG.BOT_RUNNING ? '🟢 LIVE' : '🔴 OFF';
+
+            document.getElementById('po-status-badge').className = 'status-badge' + (CONFIG.BOT_RUNNING ? '' : ' off');
+
+            uiLog('Bot ' + (CONFIG.BOT_RUNNING ? 'ON' : 'OFF')); savePrefs(); refreshPanelLive();
+
+        });
+
+        document.getElementById('po-vip-tg-toggle').addEventListener('click', function () {
+
+            CONFIG.TELEGRAM_ENABLED = !CONFIG.TELEGRAM_ENABLED;
+
+            this.classList.toggle('on', CONFIG.TELEGRAM_ENABLED);
+
+            uiLog('Telegram ' + (CONFIG.TELEGRAM_ENABLED ? 'ON' : 'OFF')); savePrefs();
+
+        });
+
+        document.getElementById('po-vip-autokill-toggle').addEventListener('click', function () {
+
+            CONFIG.AUTO_KILL_ENABLED = !CONFIG.AUTO_KILL_ENABLED;
+
+            this.classList.toggle('on', CONFIG.AUTO_KILL_ENABLED);
+
+            uiLog('Auto-Kill ' + (CONFIG.AUTO_KILL_ENABLED ? 'ON' : 'OFF')); savePrefs();
+
+        });
+
+        document.getElementById('po-vip-autotrade-toggle').addEventListener('click', function () {
+
+            CONFIG.AUTOTRADE_ENABLED = !CONFIG.AUTOTRADE_ENABLED;
+
+            this.classList.toggle('on', CONFIG.AUTOTRADE_ENABLED);
+
+            uiLog('AutoTrade DEMO ' + (CONFIG.AUTOTRADE_ENABLED ? 'ON' : 'OFF'));
+
+            savePrefs(); refreshPanelLive();
+
+        });
+
+        document.getElementById('po-vip-multipar-toggle').addEventListener('click', function () {
+
+            CONFIG.MULTI_PAR_ENABLED = !CONFIG.MULTI_PAR_ENABLED;
+
+            this.classList.toggle('on', CONFIG.MULTI_PAR_ENABLED);
+
+            uiLog('Multi‑Par Favoritos ' + (CONFIG.MULTI_PAR_ENABLED ? 'ON' : 'OFF'));
+
+            savePrefs(); refreshPanelLive();
+
+        });
+
+        document.getElementById('po-vip-martingale-toggle').addEventListener('click', function () {
+
+            CONFIG.MARTINGALE_ENABLED = !CONFIG.MARTINGALE_ENABLED;
+
+            this.classList.toggle('on', CONFIG.MARTINGALE_ENABLED);
+
+            uiLog('Martingala ' + (CONFIG.MARTINGALE_ENABLED ? 'ON' : 'OFF'));
+
+            savePrefs(); refreshPanelLive();
+
+        });
+
+        document.getElementById('po-vip-min-conf').addEventListener('change', function () {
+
+            CONFIG.MIN_CONFLUENCE_SCORE = parseInt(this.value) || 1;
+
+            uiLog('Confluencia mínima → ' + CONFIG.MIN_CONFLUENCE_SCORE);
+
+            savePrefs();
+
+        });
+
+        document.getElementById('po-vip-op-mode').addEventListener('change', function () {
+
+            CONFIG.OPERATION_MODE = this.value;
+
+            uiLog('Modo → ' + (this.value==='normal'?'Normal':'Prueba')); savePrefs();
+
+        });
+
+        document.getElementById('po-vip-min-payout').addEventListener('change', function () {
+
+            CONFIG.MIN_PAYOUT = parseInt(this.value) || 80;
+
+            uiLog('Payout mínimo → ' + CONFIG.MIN_PAYOUT + '%'); savePrefs();
+
+        });
+
+        document.getElementById('po-vip-pull-level').addEventListener('change', function () { applyPullbackLevel(this.value); uiLog('Pullback → ' + this.value); savePrefs(); });
+
+        document.getElementById('po-vip-eng-level').addEventListener('change', function () { applyEngulfLevel(this.value); uiLog('Engulfing → ' + this.value); savePrefs(); });
+
+        var pills = document.querySelectorAll('#po-strats-pills .pill');
+
+        for (var i = 0; i < pills.length; i++) {
+
+            pills[i].addEventListener('click', function () {
+
+                var key = this.getAttribute('data-en');
+
+                CONFIG[key] = !CONFIG[key];
+
+                this.classList.toggle('active', CONFIG[key]);
+
+                uiLog(key.replace('ENABLE_', '') + ' = ' + CONFIG[key]); savePrefs();
+
+            });
+
+        }
+
+        document.getElementById('po-vip-auto-top3').addEventListener('click', autoTop3);
+
+        document.getElementById('po-vip-pairs-all').addEventListener('click', function () { setAllPairsEnabled(true); uiLog('Pares ON'); });
+
+        document.getElementById('po-vip-pairs-none').addEventListener('click', function () { setAllPairsEnabled(false); uiLog('Pares OFF'); });
+
+        document.getElementById('po-vip-summary').addEventListener('click', function () { sendTelegramMessage(buildSessionSummary()); uiLog('Resumen enviado'); });
+
+        document.getElementById('po-vip-log-clear').addEventListener('click', function () { localLog = []; renderPanelLog(); });
+
+        document.getElementById('po-vip-save').addEventListener('click', function () { savePrefs(); uiLog('UI guardada'); });
+
+        document.getElementById('po-vip-export-csv').addEventListener('click', exportLossCSV);
+
+    }
+
+    function applySavedPrefsToUi() {
+
+        var prefs = loadPrefs();
+
+        if (prefs) {
+
+            if (typeof prefs.bot === 'boolean') CONFIG.BOT_RUNNING = prefs.bot;
+
+            if (typeof prefs.tg === 'boolean') CONFIG.TELEGRAM_ENABLED = prefs.tg;
+
+            if (typeof prefs.autoTrade === 'boolean') CONFIG.AUTOTRADE_ENABLED = prefs.autoTrade;
+
+            if (typeof prefs.multiPar === 'boolean') CONFIG.MULTI_PAR_ENABLED = prefs.multiPar;
+
+            if (typeof prefs.martingale === 'boolean') CONFIG.MARTINGALE_ENABLED = prefs.martingale;
+
+            if (typeof prefs.autoKill === 'boolean') CONFIG.AUTO_KILL_ENABLED = prefs.autoKill;
+
+            if (prefs.mode) CONFIG.OPERATION_MODE = prefs.mode;
+
+            if (prefs.minPayout) CONFIG.MIN_PAYOUT = prefs.minPayout;
+
+            if (prefs.minConf) CONFIG.MIN_CONFLUENCE_SCORE = prefs.minConf;
+
+            if (prefs.pull) applyPullbackLevel(prefs.pull);
+
+            if (prefs.eng) applyEngulfLevel(prefs.eng);
+
+            if (prefs.enables) for (var ek in prefs.enables) if (prefs.enables.hasOwnProperty(ek)) CONFIG[ek] = prefs.enables[ek];
+
+        }
+
+        document.getElementById('po-vip-bot-toggle').classList.toggle('on', CONFIG.BOT_RUNNING);
+
+        document.getElementById('po-vip-tg-toggle').classList.toggle('on', CONFIG.TELEGRAM_ENABLED);
+
+        document.getElementById('po-vip-autokill-toggle').classList.toggle('on', CONFIG.AUTO_KILL_ENABLED);
+
+        document.getElementById('po-vip-autotrade-toggle').classList.toggle('on', CONFIG.AUTOTRADE_ENABLED);
+
+        document.getElementById('po-vip-multipar-toggle').classList.toggle('on', CONFIG.MULTI_PAR_ENABLED);
+
+        document.getElementById('po-vip-martingale-toggle').classList.toggle('on', CONFIG.MARTINGALE_ENABLED);
+
+        document.getElementById('po-vip-min-conf').value = CONFIG.MIN_CONFLUENCE_SCORE;
+
+        document.getElementById('po-vip-op-mode').value = CONFIG.OPERATION_MODE;
+
+        document.getElementById('po-vip-min-payout').value = CONFIG.MIN_PAYOUT;
+
+        document.getElementById('po-vip-pull-level').value = CONFIG.PULLBACK_LEVEL;
+
+        document.getElementById('po-vip-eng-level').value = CONFIG.ENGULF_LEVEL;
+
+        document.getElementById('po-status-badge').textContent = CONFIG.BOT_RUNNING ? '🟢 LIVE' : '🔴 OFF';
+
+        document.getElementById('po-status-badge').className = 'status-badge' + (CONFIG.BOT_RUNNING ? '' : ' off');
+
+        var pills = document.querySelectorAll('#po-strats-pills .pill');
+
+        for (var i = 0; i < pills.length; i++) { var key = pills[i].getAttribute('data-en'); pills[i].classList.toggle('active', !!CONFIG[key]); }
+
+    }
+
+    function setAllPairsEnabled(on) { for (var k in pairWatch) if (pairWatch.hasOwnProperty(k)) { pairWatch[k].enabled = on; pairWatch[k].paused = false; } savePairStates(); renderPairList(); }
+
+    function renderPairList() {
+
+        var box = document.getElementById('po-vip-pairs'); if (!box) return;
+
+        var keys = Object.keys(pairWatch).sort(); if (!keys.length) { box.innerHTML = '<span class="muted">Esperando ticks…</span>'; return; }
+
+        var html = '';
+
+        for (var i = 0; i < keys.length; i++) {
+
+            var p = keys[i], en = pairWatch[p].enabled !== false, paused = pairWatch[p].paused === true;
+
+            var dead = deadZonePauseUntil[p] && Date.now() < deadZonePauseUntil[p];
+
+            var pay = pairPayouts[p] || 85;
+
+            var color = pay >= 85 ? '#4ade80' : pay >= 80 ? '#fbbf24' : '#f87171';
+
+            var cls = 'pair-card' + (en ? '' : ' off') + (paused || dead ? ' paused' : '');
+
+            html += '<div class="' + cls + '"><span style="cursor:pointer" data-toggle-pair="' + escAttr(p) + '">' + formatPairDisplay(p) + ' <b style="color:' + color + ';">' + pay + '%</b>' + (dead ? ' 💤' : '') + '</span></div>';
+
+        }
+
+        box.innerHTML = html;
+
+        box.querySelectorAll('[data-toggle-pair]').forEach(function (el) {
+
+            el.addEventListener('click', function () {
+
+                var pair = this.getAttribute('data-toggle-pair');
+
+                if (pairWatch[pair]) {
+
+                    if (pairWatch[pair].paused) { pairWatch[pair].paused = false; pairWatch[pair].enabled = true; }
+
+                    else pairWatch[pair].enabled = !pairWatch[pair].enabled;
+
+                    savePairStates(); renderPairList();
+
+                }
+
+            });
+
+        });
+
+    }
+
+    function renderPanelLog() {
+
+        var el = document.getElementById('po-vip-log'); if (!el) return; var html = '';
+
+        for (var i = 0; i < localLog.length; i++) { var line = localLog[i], cls = '', msg = line.msg || line; if (typeof line === 'object') { if (msg.indexOf('WIN') !== -1) cls = 'color:#4ade80;'; else if (msg.indexOf('LOSS') !== -1) cls = 'color:#f87171;'; else if (msg.indexOf('SEÑAL') !== -1) cls = 'color:#38bdf8;'; html += '<div style="' + cls + '"><span style="color:#475569;">' + line.t + '</span> ' + msg + '</div>'; } else html += '<div>' + line + '</div>'; }
+
+        el.innerHTML = html; el.scrollTop = el.scrollHeight;
+
+    }
+
+    function countSessionWL() { var w=0,l=0; for (var i=0;i<sessionLog.length;i++) { if(sessionLog[i].win) w++; else l++; } return {w:w,l:l,tot:w+l}; }
+
+    function refreshPanelLive() {
+
+        if (!panelReady) return; var wl = countSessionWL();
+
+        document.getElementById('m-signals').textContent = wl.tot; document.getElementById('m-wins').textContent = wl.w; document.getElementById('m-losses').textContent = wl.l;
+
+        var wr = wl.tot ? Math.round((wl.w/wl.tot)*100) : 0;
+
+        document.getElementById('m-wr').textContent = wr + '%';
+
+        document.getElementById('po-global-wr').textContent = 'WR ' + wr + '%';
+
+        var sigEl = document.getElementById('po-vip-signal');
+
+        if (lastSignalUI) {
+
+            sigEl.innerHTML = '<div style="font-weight:600;">' + lastSignalUI.pair + '</div><div class="po-vip-dir" style="color:' + (lastSignalUI.dir==='CALL'?'#4ade80':'#f87171') + '">' + lastSignalUI.dir + '</div><div class="muted">' + lastSignalUI.motor + ' · ' + lastSignalUI.hm + '</div>';
+
+        } else {
+
+            sigEl.innerHTML = '<div class="muted">Sin señal activa</div>';
+
+        }
+
+        updateMotorStatsUI();
+
+        var atStatus = document.getElementById('po-autotrade-status');
+
+        if (atStatus) {
+
+            if (CONFIG.AUTOTRADE_ENABLED) {
+
+                var visiblePair = getVisiblePairFromUI();
+
+                var modeText = CONFIG.MULTI_PAR_ENABLED ? ' (Multi)' : '';
+
+                if (visiblePair) {
+
+                    atStatus.textContent = '🟢 ' + formatPairDisplay(visiblePair) + modeText;
+
+                    atStatus.style.color = '#4ade80';
+
+                } else {
+
+                    atStatus.textContent = '🟡 Esperando par' + modeText;
+
+                    atStatus.style.color = '#fbbf24';
+
+                }
+
+            } else {
+
+                atStatus.textContent = '';
+
+            }
+
+        }
+
+    }
+
+    // ==================== FUNCIONES INTELIGENTES ====================
+
+    function autoTop3() {
+
+        var motorNames = [
+
+            { key: 'ENABLE_BOLLINGER', name: 'Bollinger Bounce' }, { key: 'ENABLE_PINBAR', name: 'Pin Bar Rejection' }, { key: 'ENABLE_INSIDE_BAR', name: 'Inside Bar Break' },
+
+            { key: 'ENABLE_ALLIGATOR', name: 'Impulso Alligator' }, { key: 'ENABLE_GAP_FILL', name: 'Gap Fill' }, { key: 'ENABLE_PULLBACK', name: 'Pullback Fib' },
+
+            { key: 'ENABLE_ENGULFING', name: 'PA · Engulfing' }, { key: 'ENABLE_GAP', name: 'PA · Gap' }, { key: 'ENABLE_TRAP_WICK', name: 'Trap Wick Fade' },
+
+            { key: 'ENABLE_FALSE_BREAK', name: 'False Break Fade' }
+
+        ];
+
+        var valid = [];
+
+        for (var i = 0; i < motorNames.length; i++) {
+
+            var m = motorNames[i]; var stats = statsByMotor[m.name];
+
+            if (stats && (stats.w + stats.wG1 + stats.l) >= 5) { var wr = (stats.w + stats.wG1) / (stats.w + stats.wG1 + stats.l); valid.push({ key: m.key, wr: wr }); }
+
+        }
+
+        valid.sort(function(a, b) { return b.wr - a.wr; });
+
+        var top3Keys = valid.slice(0, 3).map(function(x) { return x.key; });
+
+        for (var j = 0; j < motorNames.length; j++) CONFIG[motorNames[j].key] = false;
+
+        for (var k = 0; k < top3Keys.length; k++) CONFIG[top3Keys[k]] = true;
+
+        uiLog('⚡ Auto-Top 3: ' + top3Keys.join(', '));
+
+        savePrefs(); applySavedPrefsToUi();
+
+    }
+
+    function autoKillCheck() {
+
+        if (!CONFIG.AUTO_KILL_ENABLED) return;
+
+        var motors = [
+
+            { key: 'ENABLE_BOLLINGER', name: 'Bollinger Bounce' }, { key: 'ENABLE_PINBAR', name: 'Pin Bar Rejection' }, { key: 'ENABLE_INSIDE_BAR', name: 'Inside Bar Break' },
+
+            { key: 'ENABLE_ALLIGATOR', name: 'Impulso Alligator' }, { key: 'ENABLE_GAP_FILL', name: 'Gap Fill' }, { key: 'ENABLE_PULLBACK', name: 'Pullback Fib' },
+
+            { key: 'ENABLE_ENGULFING', name: 'PA · Engulfing' }, { key: 'ENABLE_GAP', name: 'PA · Gap' }, { key: 'ENABLE_TRAP_WICK', name: 'Trap Wick Fade' },
+
+            { key: 'ENABLE_FALSE_BREAK', name: 'False Break Fade' }
+
+        ];
+
+        var windowSize = CONFIG.AUTO_KILL_WINDOW, minWR = CONFIG.AUTO_KILL_MIN_WR;
+
+        for (var i = 0; i < motors.length; i++) {
+
+            var m = motors[i]; if (!CONFIG[m.key]) continue;
+
+            var recent = motorRecentResults[m.name] || []; if (recent.length < windowSize) continue;
+
+            var wins = 0; for (var j = recent.length - windowSize; j < recent.length; j++) { if (recent[j]) wins++; }
+
+            var wr = wins / windowSize;
+
+            if (wr < minWR) { CONFIG[m.key] = false; uiLog('💀 Auto-Kill: ' + m.name + ' desactivado (WR ' + (wr*100).toFixed(0) + '%)'); }
+
+        }
+
+        savePrefs(); applySavedPrefsToUi();
+
+    }
+
+    function exportLossCSV() {
+
+        if (lossLog.length === 0) {
+
+            uiLog('No hay datos de pérdidas para exportar');
+
+            return;
+
+        }
+
+        var csvContent = "data:text/csv;charset=utf-8,";
+
+        csvContent += "Fecha,Hora,Par,Motor,Dirección,Apertura,Cierre,Máximo,Mínimo,Mecha Sup,Mecha Inf,Cuerpo,RSI,Payout,Ticks\n";
+
+        for (var i = 0; i < lossLog.length; i++) {
+
+            var l = lossLog[i];
+
+            var row = [
+
+                l.date, l.time, l.pair, l.motor, l.dir,
+
+                l.open, l.close, l.high, l.low,
+
+                l.upperWick, l.lowerWick, l.body,
+
+                l.rsi, l.payout, l.ticks
+
+            ].join(',');
+
+            csvContent += row + "\n";
+
+        }
+
+        var encodedUri = encodeURI(csvContent);
+
+        var link = document.createElement("a");
+
+        link.setAttribute("href", encodedUri);
+
+        link.setAttribute("download", "losses_" + new Date().toISOString().slice(0,10) + ".csv");
+
+        document.body.appendChild(link);
+
+        link.click();
+
+        document.body.removeChild(link);
+
+        uiLog('📥 CSV exportado (' + lossLog.length + ' pérdidas)');
+
+    }
+
+    // ==================== INDICADORES ====================
+
+    function candleMetrics(c) { var body=Math.abs(c.close-c.open), range=c.high-c.low; return {body,range,bodyRatio:range>0?body/range:0,upperWick:c.high-Math.max(c.open,c.close),lowerWick:Math.min(c.open,c.close)-c.low,bullish:c.close>=c.open}; }
+
+    function avgRange(candles,n) { if(!candles.length) return 0; var s=candles.slice(-n), sum=0; for(var i=0;i<s.length;i++) sum+=s[i].high-s[i].low; return sum/s.length; }
+
+    function getSMA(closes,period,offset) { if(closes.length<period+offset) return 0; var start=closes.length-period-offset, sum=0; for(var i=start;i<start+period;i++) sum+=closes[i]; return sum/period; }
+
+    function getRSI(closes,period) { if(closes.length<period+1) return 50; var gains=0,losses=0; for(var i=closes.length-period;i<closes.length;i++){ var diff=closes[i]-closes[i-1]; if(diff>0) gains+=diff; else losses-=diff; } var ag=gains/period, al=losses/period; return al===0?100:100-100/(1+ag/al); }
+
+    function getSMAWithShift(closes,period,shift) { var start=closes.length-period-shift; if(start<0) return 0; var sum=0; for(var i=start;i<start+period;i++) sum+=closes[i]; return sum/period; }
+
+    function getDeMarker(highs,lows,period,shift) { var end=highs.length-shift, start=end-period; if(start<0) return 50; var sumMax=0,sumMin=0; for(var i=start;i<end;i++){ sumMax+=highs[i]>highs[i-1]?highs[i]-highs[i-1]:0; sumMin+=lows[i]<lows[i-1]?lows[i-1]-lows[i]:0; } var a=sumMax/period,b=sumMin/period; return a+b===0?50:a/(a+b)*100; }
+
+    function getMomentum(closes,period) { return closes.length<=period?0:closes[closes.length-1]-closes[closes.length-1-period]; }
+
+    function getStochastic(highs,lows,closes,period,kSmooth,dSmooth) { if(closes.length<period+kSmooth) return {k:50,d:50}; var rawK=[]; for(var i=period-1;i<closes.length;i++){ var hh=-Infinity,ll=Infinity; for(var j=i-period+1;j<=i;j++){ if(highs[j]>hh) hh=highs[j]; if(lows[j]<ll) ll=lows[j]; } rawK.push(hh===ll?50:(closes[i]-ll)/(hh-ll)*100); } var smoothK=[]; for(var s=0;s<=rawK.length-kSmooth;s++){ var sum=0; for(var x=0;x<kSmooth;x++) sum+=rawK[s+x]; smoothK.push(sum/kSmooth); } var k=smoothK[smoothK.length-1],d=k; if(smoothK.length>=dSmooth){ var sumD=0; for(var y=smoothK.length-dSmooth;y<smoothK.length;y++) sumD+=smoothK[y]; d=sumD/dSmooth; } return {k,d}; }
+
+    function getEMA(closes,period) { if(closes.length<period) return 0; var k=2/(period+1), ema=closes[closes.length-period]; for(var i=closes.length-period+1;i<closes.length;i++) ema=closes[i]*k+ema*(1-k); return ema; }
+
+    function getBollinger(closes,period,stdMult) { if(closes.length<period) return {mid:0,upper:0,lower:0}; var slice=closes.slice(-period),sum=0; for(var i=0;i<slice.length;i++) sum+=slice[i]; var mid=sum/period, variance=0; for(i=0;i<slice.length;i++) variance+=Math.pow(slice[i]-mid,2); var std=Math.sqrt(variance/period); return {mid,upper:mid+std*stdMult,lower:mid-std*stdMult}; }
+
+    function m1Bias(m1) { if(m1.length<4) return 'FLAT'; var a=m1[m1.length-2].close,b=m1[m1.length-4].close; return a>b?'UP':a<b?'DOWN':'FLAT'; }
+
+    function regimeOK(m1Sim,chaos,dead,chop) { if(m1Sim.length<8) return false; var avg=avgRange(m1Sim.slice(0,-1),6); if(avg<=0) return false; var cur=m1Sim[m1Sim.length-1], r=cur.high-cur.low; if(r>avg*chaos||r<avg*dead) return false; var slice=m1Sim.slice(-chop),alts=0,small=0; for(var i=1;i<slice.length;i++){ var m=candleMetrics(slice[i]); if(m.bodyRatio<0.35) small++; if((slice[i].close>=slice[i].open)!==(slice[i-1].close>=slice[i-1].open)) alts++; } return !(small>=4&&alts>=4); }
+
+    function swingLevels(m1Sim) { var slice=m1Sim.slice(-CONFIG.SWING_LOOKBACK,-1); if(!slice.length) return {maxH:0,minL:0,range:0}; var maxH=-Infinity,minL=Infinity; for(var i=0;i<slice.length;i++){ if(slice[i].high>maxH) maxH=slice[i].high; if(slice[i].low<minL) minL=slice[i].low; } return {maxH,minL,range:maxH-minL}; }
+
+    function nearSR(price,levels,prox) { if(levels.range<=0) return false; var band=levels.range*prox; return Math.abs(price-levels.maxH)<=band||Math.abs(price-levels.minL)<=band; }
+
+    function getMotorRecentWinRate(motor) { if(!motorRecentResults[motor]||motorRecentResults[motor].length===0) return 0.5; var wins=0,total=Math.min(motorRecentResults[motor].length,CONFIG.MOTOR_CONFIDENCE_WINDOW); for(var i=motorRecentResults[motor].length-total;i<motorRecentResults[motor].length;i++) if(motorRecentResults[motor][i]) wins++; return wins/total; }
+
+    function updateMotorRecent(motor,isWin) { if(!motorRecentResults[motor]) motorRecentResults[motor]=[]; motorRecentResults[motor].push(isWin); while(motorRecentResults[motor].length>CONFIG.MOTOR_CONFIDENCE_WINDOW) motorRecentResults[motor].shift(); }
+
+    function checkDeadZone(pairLabel,m1Sim) { if(m1Sim.length<CONFIG.DEAD_ZONE_MINUTES) return false; var slice=m1Sim.slice(-CONFIG.DEAD_ZONE_MINUTES),maxH=-Infinity,minL=Infinity; for(var i=0;i<slice.length;i++){ if(slice[i].high>maxH) maxH=slice[i].high; if(slice[i].low<minL) minL=slice[i].low; } var range=maxH-minL,price=m1Sim[m1Sim.length-1].close; if(price>0&&range/price<CONFIG.DEAD_ZONE_PCT){ deadZonePauseUntil[pairLabel]=Date.now()+CONFIG.DEAD_ZONE_PAUSE_MINUTES*60000; uiLog('💤 Zona muerta '+formatPairDisplay(pairLabel)+' - Pausado '+CONFIG.DEAD_ZONE_PAUSE_MINUTES+' min'); return true; } return false; }
+
+    // ==================== EVALUATE ALL (v5.8 con todos los motores) ====================
+
+    function confluenceScore(dir,m1Sim,levels,hasPattern) {
+
+        var closes=m1Sim.map(c=>c.close);
+
+        var maUp=getSMA(closes,CONFIG.MA_PERIOD,0)>getSMA(closes,CONFIG.MA_PERIOD,CONFIG.MA_SLOPE_LOOKBACK);
+
+        var rsi=getRSI(closes,CONFIG.RSI_PERIOD);
+
+        var near=nearSR(m1Sim[m1Sim.length-1].close,levels,CONFIG.SR_PROXIMITY);
+
+        var trendOK = (dir==='CALL' && (maUp||m1Bias(m1Sim)==='UP')) || (dir==='PUT' && (!maUp||m1Bias(m1Sim)==='DOWN'));
+
+        var rsiOK = (dir==='CALL' && rsi>=35 && rsi<=62) || (dir==='PUT' && rsi>=38 && rsi<=65);
+
+        var score = hasPattern ? 1 : 0;
+
+        if (trendOK) score++;
+
+        if (rsiOK) score++;
+
+        if (near) score++;
+
+        return { total: score, trend: trendOK, rsi: rsiOK, sr: near, rsiValue: rsi };
+
+    }
+
+    function isMotorPaused(motor) {
+
+        return motorPausedUntil[motor] && Date.now() < motorPausedUntil[motor];
+
+    }
+
+    function updateMotorConsecutive(motor) {
+
+        if (motor === lastMotorUsed) {
+
+            motorConsecutiveCount[motor] = (motorConsecutiveCount[motor] || 0) + 1;
+
+        } else {
+
+            motorConsecutiveCount = {};
+
+            motorConsecutiveCount[motor] = 1;
+
+        }
+
+        lastMotorUsed = motor;
+
+        if (motorConsecutiveCount[motor] >= CONFIG.REPETITION_PAUSE_LIMIT) {
+
+            motorPausedUntil[motor] = Date.now() + CONFIG.REPETITION_PAUSE_MINUTES * 60000;
+
+            uiLog('⏸️ Auto‑pausa: ' + motor + ' por ' + CONFIG.REPETITION_PAUSE_MINUTES + ' min (' + CONFIG.REPETITION_PAUSE_LIMIT + ' señales seguidas)');
+
+            motorConsecutiveCount = {};
+
+        }
+
+    }
+
+    function evaluateAll(pair,time,m1Sim,s15Sim,alertSec) {
+
+        if(!CONFIG.BOT_RUNNING||cyclesToday>=CONFIG.MAX_SIGNALS_SESSION) return;
+
+        if(CONFIG.OPERATION_MODE==='normal'&&(hasOpenCycle())) return;
+
+        if(activeTrades[pair]||pendingTrades[pair]) return;
+
+        if(!regimeOK(m1Sim,CONFIG.CHAOS_MULT,CONFIG.DEAD_RATIO,CONFIG.CHOP_LOOKBACK)||checkDeadZone(pair,m1Sim)) return;
+
+        // NUEVOS FILTROS BASADOS EN CSV
+
+        var curPrice = m1Sim[m1Sim.length-1].close;
+
+        if (curPrice < CONFIG.MIN_PRICE_FILTER) return; // ignorar pares con precio muy bajo
+
+        if ((tickCountByPair[pair]||0) < CONFIG.MIN_TICKS_PER_CANDLE) return;
+
+        var payout=pairPayouts[pair]||85;
+
+        if(payout<CONFIG.MIN_PAYOUT){ if(pairWatch[pair]&&!pairWatch[pair].paused){ pairWatch[pair].paused=true; uiLog('🟡 Auto-pausa '+formatPairDisplay(pair)+' (Payout '+payout+'%)'); savePairStates(); renderPairList(); } return; }
+
+        else if(pairWatch[pair]&&pairWatch[pair].paused){ pairWatch[pair].paused=false; uiLog('🟢 Auto-reactiva '+formatPairDisplay(pair)); savePairStates(); renderPairList(); }
+
+        if(!isPairEnabled(pair)||(tickCountByPair[pair]||0)<CONFIG.MIN_TICKS_PER_CANDLE) return;
+
+        var share = getPairShare(pair);
+
+        if (share > CONFIG.PAIR_MAX_SHARE) return;
+
+        var levels=swingLevels(m1Sim),cur=m1Sim[m1Sim.length-1],m=candleMetrics(cur);
+
+        var closes=m1Sim.map(c=>c.close),highs=m1Sim.map(c=>c.high),lows=m1Sim.map(c=>c.low);
+
+        var maUp=getSMA(closes,CONFIG.MA_PERIOD,0)>getSMA(closes,CONFIG.MA_PERIOD,CONFIG.MA_SLOPE_LOOKBACK);
+
+        var atr=avgRange(m1Sim.slice(0,-1),6);
+
+        var candidates = [];
+
+        function addCandidate(dir, motor, scoreObj, bonus) {
+
+            if (isMotorPaused(motor)) return;
+
+            var sc = scoreObj.total + (bonus || 0);
+
+            // Filtro de RSI fuera de zona muerta (salvo para motores específicos)
+
+            if (CONFIG.RSI_DEAD_ZONE > 0 && Math.abs(scoreObj.rsiValue - 50) < CONFIG.RSI_DEAD_ZONE) return;
+
+            if (sc >= CONFIG.MIN_CONFLUENCE_SCORE) {
+
+                candidates.push({dir, motor, score: sc, metrics: scoreObj});
+
+            }
+
+        }
+
+        // 1. Gap (REACTIVADO - parámetros relajados)
+
+        if(CONFIG.ENABLE_GAP&&m1Sim.length>=2){ var prev=m1Sim[m1Sim.length-2],gap=prev.close!==0?(cur.open-prev.close)/Math.abs(prev.close):0;
+
+            if(gap>=CONFIG.PA_GAP_MIN_PCT&&m.bullish&&m.bodyRatio>=CONFIG.PA_MIN_BODY&&(maUp||m1Bias(m1Sim)==='UP')){ var score = confluenceScore('CALL',m1Sim,levels,true); addCandidate('CALL','PA · Gap',score,0); }
+
+            if(gap<=-CONFIG.PA_GAP_MIN_PCT&&!m.bullish&&m.bodyRatio>=CONFIG.PA_MIN_BODY&&(!maUp||m1Bias(m1Sim)==='DOWN')){ var score = confluenceScore('PUT',m1Sim,levels,true); addCandidate('PUT','PA · Gap',score,0); }
+
+        }
+
+        // 2. Gap Fill
+
+        if(CONFIG.ENABLE_GAP_FILL&&m1Sim.length>=2){ var prevGap=m1Sim[m1Sim.length-2],gapSize=prevGap.close!==0?(cur.open-prevGap.close)/Math.abs(prevGap.close):0,gapAbs=Math.abs(gapSize);
+
+            if(gapAbs>=0.00015&&gapAbs<0.0008&&m.bodyRatio>=0.3){
+
+                if(gapSize>0&&!m.bullish&&cur.close<prevGap.close+(cur.open-prevGap.close)*0.6){ var score = confluenceScore('PUT',m1Sim,levels,true); addCandidate('PUT','Gap Fill',score,0); }
+
+                if(gapSize<0&&m.bullish&&cur.close>prevGap.close+(cur.open-prevGap.close)*0.6){ var score = confluenceScore('CALL',m1Sim,levels,true); addCandidate('CALL','Gap Fill',score,0); }
+
+            }
+
+        }
+
+        // 3. Trap Wick (REACTIVADO - parámetros relajados)
+
+        if(CONFIG.ENABLE_TRAP_WICK&&m.range>0&&levels.range>0){
+
+            if(m.upperWick/m.range>=CONFIG.PA_PIN_TRAP_WICK&&!m.bullish&&nearSR(cur.close,levels,CONFIG.SR_PROXIMITY)){ var score = confluenceScore('PUT',m1Sim,levels,true); addCandidate('PUT','Trap Wick Fade',score,0); }
+
+            if(m.lowerWick/m.range>=CONFIG.PA_PIN_TRAP_WICK&&m.bullish&&nearSR(cur.close,levels,CONFIG.SR_PROXIMITY)){ var score = confluenceScore('CALL',m1Sim,levels,true); addCandidate('CALL','Trap Wick Fade',score,0); }
+
+        }
+
+        // 4. False Break (REACTIVADO)
+
+        if(CONFIG.ENABLE_FALSE_BREAK&&m1Sim.length>=CONFIG.BO_LOOKBACK+1){ var look=m1Sim.slice(-(CONFIG.BO_LOOKBACK+1),-1),mx=-Infinity,mn=Infinity;
+
+            for(var li=0;li<look.length;li++){ if(look[li].high>mx) mx=look[li].high; if(look[li].low<mn) mn=look[li].low; }
+
+            if(cur.high>mx&&cur.close<mx){ var score = confluenceScore('PUT',m1Sim,levels,true); addCandidate('PUT','False Break Fade',score,0); }
+
+            if(cur.low<mn&&cur.close>mn){ var score = confluenceScore('CALL',m1Sim,levels,true); addCandidate('CALL','False Break Fade',score,0); }
+
+        }
+
+        // 5. Bollinger Bounce
+
+        if(CONFIG.ENABLE_BOLLINGER&&m1Sim.length>=25){ var bb=getBollinger(closes,CONFIG.BB_PERIOD,CONFIG.BB_STD),rsiBB=getRSI(closes,CONFIG.RSI_PERIOD);
+
+            if((cur.low<=bb.lower||cur.close<bb.lower)&&rsiBB<35){ var score = confluenceScore('CALL',m1Sim,levels,true); addCandidate('CALL','Bollinger Bounce',score,0); }
+
+            if((cur.high>=bb.upper||cur.close>bb.upper)&&rsiBB>65){ var score = confluenceScore('PUT',m1Sim,levels,true); addCandidate('PUT','Bollinger Bounce',score,0); }
+
+        }
+
+        // 6. Pin Bar Rejection
+
+        if(CONFIG.ENABLE_PINBAR&&m.range>0&&levels.range>0){
+
+            if(m.lowerWick/m.range>=0.55&&m.bodyRatio<=0.35&&m.bullish&&nearSR(cur.close,levels,0.40)){ var score = confluenceScore('CALL',m1Sim,levels,true); addCandidate('CALL','Pin Bar Rejection',score,0); }
+
+            if(m.upperWick/m.range>=0.55&&m.bodyRatio<=0.35&&!m.bullish&&nearSR(cur.close,levels,0.40)){ var score = confluenceScore('PUT',m1Sim,levels,true); addCandidate('PUT','Pin Bar Rejection',score,0); }
+
+        }
+
+        // 7. Inside Bar
+
+        if(CONFIG.ENABLE_INSIDE_BAR&&m1Sim.length>=2){ var prevIB=m1Sim[m1Sim.length-2];
+
+            if(cur.high<=prevIB.high&&cur.low>=prevIB.low&&cur.high!==cur.low){ var range=cur.high-cur.low;
+
+                if(cur.close>prevIB.high||(cur.close-prevIB.low)/range>=0.8){ var score = confluenceScore('CALL',m1Sim,levels,true); addCandidate('CALL','Inside Bar Break',score,0); }
+
+                else if(cur.close<prevIB.low||(prevIB.high-cur.close)/range>=0.8){ var score = confluenceScore('PUT',m1Sim,levels,true); addCandidate('PUT','Inside Bar Break',score,0); }
+
+            }
+
+        }
+
+        // 8. Alligator
+
+        if(CONFIG.ENABLE_ALLIGATOR&&s15Sim.length>=CONFIG.ALLIGATOR_MIN_S15){ var c15=s15Sim.map(c=>c.close),h15=s15Sim.map(c=>c.high),l15=s15Sim.map(c=>c.low),cJ=getSMAWithShift(c15,15,5),cT=getSMAWithShift(c15,10,3),cL=getSMAWithShift(c15,5,1),pT=getSMAWithShift(c15,10,4),pL=getSMAWithShift(c15,5,2),pJ=getSMAWithShift(c15,15,6),dM=getDeMarker(h15,l15,15,0),pD=getDeMarker(h15,l15,15,1),mom=getMomentum(c15,15),ema20=getEMA(c15,20);
+
+            if((pL<=pT||pL<=pJ)&&cL>cT&&cL>cJ&&pD<70&&dM>=CONFIG.ALLIGATOR_DM_CALL&&mom>0&&cur.close>ema20){ var score = confluenceScore('CALL',m1Sim,levels,true); addCandidate('CALL','Impulso Alligator',score,0); }
+
+            if((pL>=pT||pL>=pJ)&&cL<cT&&cL<cJ&&pD>30&&dM<=CONFIG.ALLIGATOR_DM_PUT&&mom<0&&cur.close<ema20){ var score = confluenceScore('PUT',m1Sim,levels,true); addCandidate('PUT','Impulso Alligator',score,0); }
+
+        }
+
+        // 9. Engulfing (con bonus)
+
+        if(CONFIG.ENABLE_ENGULFING&&m1Sim.length>=2){ var prevE=m1Sim[m1Sim.length-2],pE=candleMetrics(prevE),bullE=!pE.bullish&&m.bullish&&cur.close>=prevE.open&&cur.open<=prevE.close&&m.body>=pE.body*CONFIG.PA_ENGULF_BODY_MULT,bearE=pE.bullish&&!m.bullish&&cur.close<=prevE.open&&cur.open>=prevE.close&&m.body>=pE.body*CONFIG.PA_ENGULF_BODY_MULT,sizeOk=m.bodyRatio>=CONFIG.PA_ENGULF_MIN_BODY&&pE.bodyRatio>=CONFIG.PA_ENGULF_PREV_BODY_MIN&&(atr<=0||m.range>=atr*CONFIG.PA_ENGULF_RANGE_ATR_MULT); function engulfClose(cur,dir){ var r=cur.high-cur.low; if(r<=0) return false; var thr=CONFIG.PA_ENGULF_CLOSE_EXTREME; return dir==='CALL'?(cur.close-cur.low)/r>=thr:(cur.high-cur.close)/r>=thr; }
+
+            if(bullE&&sizeOk&&engulfClose(cur,'CALL')&&(!CONFIG.PA_ENGULF_REQUIRE_TREND||maUp||m1Bias(m1Sim)==='UP')&&pE.bodyRatio>=0.15){ var score = confluenceScore('CALL',m1Sim,levels,true); addCandidate('CALL','PA · Engulfing',score,CONFIG.PA_ENGULF_SCORE_BONUS); }
+
+            if(bearE&&sizeOk&&engulfClose(cur,'PUT')&&(!CONFIG.PA_ENGULF_REQUIRE_TREND||!maUp||m1Bias(m1Sim)==='DOWN')&&pE.bodyRatio>=0.15){ var score = confluenceScore('PUT',m1Sim,levels,true); addCandidate('PUT','PA · Engulfing',score,CONFIG.PA_ENGULF_SCORE_BONUS); }
+
+        }
+
+        // 10. Pullback Fib (con mecha de rechazo)
+
+        if(CONFIG.ENABLE_PULLBACK&&levels.range>0){ var rsi=getRSI(closes,CONFIG.RSI_PERIOD); function touchClassic(cur,levels,dir){ if(levels.range<=0) return false; return dir==='CALL'?cur.low<=levels.maxH-levels.range*0.5:cur.high>=levels.minL+levels.range*0.5; }
+
+            if(maUp&&rsi<CONFIG.PULLBACK_RSI_CALL_MAX&&touchClassic(cur,levels,'CALL')&&(m.range>0&&m.lowerWick/m.range>=CONFIG.PULLBACK_REJECT_WICK)){ var score = confluenceScore('CALL',m1Sim,levels,true); addCandidate('CALL','Pullback Fib',score,0); }
+
+            if(!maUp&&rsi>CONFIG.PULLBACK_RSI_PUT_MIN&&touchClassic(cur,levels,'PUT')&&(m.range>0&&m.upperWick/m.range>=CONFIG.PULLBACK_REJECT_WICK)){ var score = confluenceScore('PUT',m1Sim,levels,true); addCandidate('PUT','Pullback Fib',score,0); }
+
+        }
+
+        if (candidates.length === 0) return;
+
+        candidates.sort(function(a, b) { return b.score - a.score; });
+
+        var best = candidates[0];
+
+        var maxScore = best.score;
+
+        var topCandidates = candidates.filter(c => c.score === maxScore);
+
+        if (topCandidates.length > 1) { best = topCandidates[Math.floor(Math.random() * topCandidates.length)]; }
+
+        updateMotorConsecutive(best.motor);
+
+        triggerSignal(pair, best.dir, time, best.motor, alertSec, best.score);
+
+    }
+
+    function hasOpenCycle() {
+
+        for (var k in pendingTrades) if (pendingTrades.hasOwnProperty(k)) return true;
+
+        for (k in activeTrades) if (activeTrades.hasOwnProperty(k)) return true;
+
+        return false;
+
+    }
+
+    // ==================== SIGNAL & RESOLVE ====================
+
+    function triggerSignal(pair, direction, time, motor, alertSec, confScore) {
+
+        var nowMin = Math.floor(time / 60);
+
+        if (nowMin - (lastSignalMinuteByPair[pair] || 0) < CONFIG.COOLDOWN_MINUTES_PER_PAIR) return false;
+
+        if (motor === 'Pullback Fib') {
+
+            if (nowMin - (lastPullbackMinuteByPair[pair] || 0) < CONFIG.PULLBACK_COOLDOWN_MIN) return false;
+
+            lastPullbackMinuteByPair[pair] = nowMin;
+
+        }
+
+        var nowHour = Math.floor(Date.now() / 3600000);
+
+        if (nowHour !== lastHourReset) { signalsThisHour = 0; signalsPerPairHour = {}; lastHourReset = nowHour; }
+
+        if (signalsThisHour >= CONFIG.MAX_SIGNALS_PER_HOUR) return false;
+
+        if ((signalsPerPairHour[pair] || 0) >= CONFIG.MAX_SIGNALS_PER_PAIR_HOUR) return false;
+
+        signalsToday++; signalsThisHour++; signalsPerPairHour[pair] = (signalsPerPairHour[pair] || 0) + 1;
+
+        lastSignalMinuteByPair[pair] = nowMin;
+
+        if (!statsByMotor[motor]) statsByMotor[motor] = { w: 0, wG1: 0, l: 0 };
+
+        var entryTs = (nowMin + 1) * 60, tDisp = getDisplayTime(entryTs);
+
+        pendingTrades[pair] = { direction, entryTimestamp: entryTs, expiryTimestamp: entryTs + CONFIG.EXPIRY_TIME_SEC, timeStr: tDisp.hm, motor, attempt: 1, alertSec: alertSec };
+
+        lastSignalUI = { pair: formatPairDisplay(pair), dir: direction === 'CALL' ? 'CALL' : 'PUT', motor, hm: tDisp.hm };
+
+        if (CONFIG.AUTOTRADE_ENABLED && CONFIG.MULTI_PAR_ENABLED) {
+
+            var signalNormalized = pair.toUpperCase().replace(/\s+/g, '').replace(/OTC/g, '').replace(/\//g, '');
+
+            var currentVisible = getVisiblePairFromUI();
+
+            if (currentVisible !== signalNormalized) {
+
+                switchToFavoritePair(pair);
+
+            }
+
+        }
+
+        var isCall = direction === 'CALL';
+
+        var payout = pairPayouts[pair] || 85;
+
+        var confStr = confScore ? ' · conf ' + confScore + ' · seg ' + alertSec : '';
+
+        sendTelegramMessage('💎 LIVE Edge💎\n🌐 Zona Horaria: UTC-1\n📊 DIVISA: ' + formatPairDisplay(pair) + '\n' + (isCall ? '🟩' : '🟥') + ' DIRECCIÓN: ' + (isCall ? 'CALL' : 'PUT') + '\n⏰ HORA DE ENTRADA: ' + tDisp.hm + '\n⏱ TIEMPO: 1 minuto (M1)\n🧠 ' + motor + confStr);
+
+        uiLog('SEÑAL ' + formatPairDisplay(pair) + ' ' + direction + ' · ' + motor + confStr);
+
+        recordPairSignal(pair);
+
+        refreshPanelLive();
+
+        autoKillCheck();
+
+        return true;
+
+    }
+
+    function resolveTrade(pairLabel, trade, price, tickTime) {
+
+        var motor = trade.motor, dir = trade.direction, attempt = trade.attempt || 1;
+
+        var disp = formatPairDisplay(pairLabel), hm = trade.timeStr || getDisplayTime(tickTime).hm;
+
+        if (!statsByMotor[motor]) statsByMotor[motor] = { w: 0, wG1: 0, l: 0 };
+
+        if ((dir==='CALL' && price>trade.entryPrice) || (dir==='PUT' && price<trade.entryPrice)) {
+
+            if (attempt === 1) { statsByMotor[motor].w++; tradeHistory.push({result:'WIN',motor}); sessionLog.push({pair:disp,hm,win:true,g1:false,dateDM:getDisplayTime(tickTime).dateDM}); }
+
+            else { statsByMotor[motor].wG1++; tradeHistory.push({result:'WIN_G1',motor}); sessionLog.push({pair:disp,hm,win:true,g1:true,dateDM:getDisplayTime(tickTime).dateDM}); }
+
+            sendTelegramMessage('✅ <b>WIN</b>' + (attempt===2?' (G1)':'') + '\n' + hm + ' | ' + disp + '\n🧠 ' + motor);
+
+            uiLog('WIN' + (attempt===2?' G1':'') + ' ' + disp + ' · ' + motor);
+
+            updateMotorRecent(motor, true);
+
+            delete activeTrades[pairLabel];
+
+            if (attempt === 1 || attempt === 2) { cyclesToday++; }
+
+            maybeSummary(); refreshPanelLive(); return;
+
+        }
+
+        // LOSS: registrar datos
+
+        var curCandle = candleState[pairLabel]?.m1;
+
+        var curMetrics = curCandle ? candleMetrics(curCandle) : {};
+
+        lossLog.push({
+
+            date: getDisplayTime(tickTime).dateDM,
+
+            time: getDisplayTime(tickTime).hm,
+
+            pair: disp,
+
+            motor: motor,
+
+            dir: dir,
+
+            open: curCandle?.open?.toFixed(5) || '',
+
+            close: curCandle?.close?.toFixed(5) || '',
+
+            high: curCandle?.high?.toFixed(5) || '',
+
+            low: curCandle?.low?.toFixed(5) || '',
+
+            upperWick: curMetrics.upperWick?.toFixed(5) || '',
+
+            lowerWick: curMetrics.lowerWick?.toFixed(5) || '',
+
+            body: curMetrics.body?.toFixed(5) || '',
+
+            rsi: getRSI((history[pairLabel]?.m1||[]).map(c=>c.close).concat([curCandle?.close||0]), CONFIG.RSI_PERIOD),
+
+            payout: pairPayouts[pairLabel] || 85,
+
+            ticks: tickCountByPair[pairLabel] || 0
+
+        });
+
+        var payout = pairPayouts[pairLabel] || 85;
+
+        var allowMartingale = CONFIG.MARTINGALE_ENABLED && payout >= CONFIG.MIN_PAYOUT_FOR_MARTINGALE;
+
+        if (attempt===1 && allowMartingale && CONFIG.MARTINGALE_STEPS>=1) {
+
+            var gTs=Math.floor(tickTime), gExp=gTs+CONFIG.EXPIRY_TIME_SEC;
+
+            activeTrades[pairLabel] = { direction:dir, entryPrice:price, entryTimestamp:gTs, expiryTimestamp:gExp, timeStr:getDisplayTime(gTs).hm, motor, attempt:2 };
+
+            if (CONFIG.AUTOTRADE_ENABLED) {
+
+                var visiblePair = getVisiblePairFromUI();
+
+                var signalPairNormalized = pairLabel.toUpperCase().replace(/\s+/g, '').replace(/OTC/g, '').replace(/\//g, '');
+
+                if (visiblePair === signalPairNormalized) {
+
+                    autoClickButton(dir, true);
+
+                } else if (CONFIG.MULTI_PAR_ENABLED && switchToFavoritePair(pairLabel)) {
+
+                    setTimeout(function() { autoClickButton(dir, true); }, 400);
+
+                } else {
+
+                    uiLog('⏭️ AutoTrade Gale: par no coincide');
+
+                }
+
+            }
+
+            sendTelegramMessage('🌀 GALE 1\n' + disp + '\n' + (dir==='CALL'?'🟩':'🟥') + ' ' + (dir==='CALL'?'CALL':'PUT') + ' · ' + motor + '\n⏰ Exp ~' + getDisplayTime(gExp).hm + ' (UTC-1)');
+
+            uiLog('GALE1 ' + disp); refreshPanelLive(); return;
+
+        }
+
+        statsByMotor[motor].l++; tradeHistory.push({result:'LOSS',motor}); sessionLog.push({pair:disp,hm,win:false,g1:false,dateDM:getDisplayTime(tickTime).dateDM});
+
+        sendTelegramMessage('❌ <b>LOSS</b>' + (attempt===2?' (G1)':'') + '\n' + hm + ' | ' + disp + '\n🧠 ' + motor);
+
+        uiLog('LOSS ' + disp + ' · ' + motor);
+
+        updateMotorRecent(motor, false);
+
+        delete activeTrades[pairLabel];
+
+        if (attempt === 1 || attempt === 2) { cyclesToday++; }
+
+        maybeSummary(); refreshPanelLive();
+
+    }
+
+    function maybeSummary() { if (sessionLog.length && sessionLog.length % CONFIG.SUMMARY_EVERY_N === 0) sendTelegramMessage(buildSessionSummary()); }
+
+    function buildSessionSummary() {
+
+        var dateStr = sessionLog.length ? sessionLog[0].dateDM : getDisplayTime(Math.floor(getAdjustedTime())).dateDM;
+
+        var lines = ['📋 <b>RESUMEN VIP Glass v5.8 (' + dateStr + ')</b> 📋', '━━━━━━━━━━━━━━━━━━'], wins=0,losses=0;
+
+        for (var i=0; i<sessionLog.length; i++) { var o=sessionLog[i]; if(o.win) { wins++; lines.push('✅ '+o.hm+' | '+o.pair+' ➔ '+(o.g1?'WIN G1':'WIN')); } else { losses++; lines.push('❌ '+o.hm+' | '+o.pair+' ➔ LOSS'); } }
+
+        var tot=wins+losses, wr=tot?Math.round(wins/tot*100):0;
+
+        lines.push('━━━━━━━━━━━━━━━━━━','📊 <b>BALANCE</b>','🏆 '+String(wins).padStart(2,'0')+'W | 🛑 '+String(losses).padStart(2,'0')+'L','📈 WR: <b>'+wr+'%</b>','🎯 '+cyclesToday+'/'+CONFIG.MAX_SIGNALS_SESSION+' ciclos');
+
+        lines.push('🧠 <b>Por motor:</b>');
+
+        for (var m in statsByMotor) { var s=statsByMotor[m], totalM=s.w+s.wG1+s.l; if(totalM>0) lines.push(m+': '+(s.w+s.wG1)+'W / '+s.l+'L'); }
+
+        return lines.join('\n');
+
+    }
+
+    // ==================== PROCESAR TICKS ====================
+
+    function processTick(pair, time, price) {
+
+        try {
+
+            if (typeof pair !== 'string' || !isFinite(time) || !isFinite(price)) return;
+
+            if (serverTimeOffset === 0) { serverTimeOffset = time - Math.floor(Date.now() / 1000); uiLog('⏱️ Sincronización: offset servidor = ' + serverTimeOffset + 's'); }
+
+            var pairLabel = normalizePairFromTick(pair);
+
+            registerPair(pairLabel); resetInactivityTimer();
+
+            var block60 = Math.floor(time / 60);
+
+            if (!tickCountByPair[pairLabel] || candleState[pairLabel]?.m1?.block !== block60) tickCountByPair[pairLabel] = 1;
+
+            else tickCountByPair[pairLabel]++;
+
+            if (activeTrades[pairLabel] && time >= activeTrades[pairLabel].expiryTimestamp) resolveTrade(pairLabel, activeTrades[pairLabel], price, time);
+
+            if (pendingTrades[pairLabel] && !activeTrades[pairLabel]) {
+
+                var pend = pendingTrades[pairLabel];
+
+                if (time >= pend.entryTimestamp) {
+
+                    if (time - pend.entryTimestamp > 8) { uiLog('⌛ Pendiente expirada sin entrada: ' + formatPairDisplay(pairLabel)); delete pendingTrades[pairLabel]; }
+
+                    else {
+
+                        activeTrades[pairLabel] = { direction: pend.direction, entryPrice: price, entryTimestamp: pend.entryTimestamp, expiryTimestamp: pend.expiryTimestamp, timeStr: pend.timeStr, motor: pend.motor, attempt: 1, alertSec: pend.alertSec };
+
+                        delete pendingTrades[pairLabel];
+
+                        uiLog('Entrada ' + formatPairDisplay(pairLabel));
+
+                        if (CONFIG.AUTOTRADE_ENABLED) {
+
+                            var visiblePair = getVisiblePairFromUI();
+
+                            var signalPairNormalized = pairLabel.toUpperCase().replace(/\s+/g, '').replace(/OTC/g, '').replace(/\//g, '');
+
+                            if (visiblePair === signalPairNormalized) {
+
+                                autoClickButton(pend.direction, false);
+
+                            } else if (CONFIG.MULTI_PAR_ENABLED) {
+
+                                if (switchToFavoritePair(pairLabel)) {
+
+                                    setTimeout(function() { autoClickButton(pend.direction, false); }, 300);
+
+                                } else {
+
+                                    uiLog('⏭️ AutoTrade: no se pudo cambiar a ' + formatPairDisplay(pairLabel));
+
+                                }
+
+                            } else {
+
+                                uiLog('⏭️ AutoTrade: par no coincide');
+
+                            }
+
+                        }
+
+                    }
+
+                } else if (pend.entryTimestamp - time > 90) delete pendingTrades[pairLabel];
+
+            }
+
+            if (!history[pairLabel]) history[pairLabel] = { s15: [], m1: [], m5: [] };
+
+            var block15 = Math.floor(time / 15), block300 = Math.floor(time / 300);
+
+            if (!candleState[pairLabel]) candleState[pairLabel] = { s15: { block: block15, open: price, high: price, low: price, close: price }, m1: { block: block60, open: price, high: price, low: price, close: price }, m5: { block: block300, open: price, high: price, low: price, close: price } };
+
+            var state = candleState[pairLabel];
+
+            function roll(tf, block, key, max) {
+
+                if (state[tf].block !== block) { history[pairLabel][key].push({ open: state[tf].open, high: state[tf].high, low: state[tf].low, close: state[tf].close }); if (history[pairLabel][key].length > max) history[pairLabel][key].shift(); state[tf] = { block: block, open: price, high: price, low: price, close: price }; if (tf === 'm1') tickCountByPair[pairLabel] = 1; }
+
+                else { state[tf].high = Math.max(state[tf].high, price); state[tf].low = Math.min(state[tf].low, price); state[tf].close = price; }
+
+            }
+
+            roll('s15', block15, 's15', 80); roll('m1', block60, 'm1', 40); roll('m5', block300, 'm5', 12);
+
+            if (!isPairEnabled(pairLabel) || !CONFIG.BOT_RUNNING || cyclesToday >= CONFIG.MAX_SIGNALS_SESSION) return;
+
+            if (CONFIG.OPERATION_MODE==='normal' && hasOpenCycle()) return;
+
+            if (activeTrades[pairLabel] || pendingTrades[pairLabel]) return;
+
+            var secInMin = time % 60;
+
+            if (secInMin < CONFIG.EVAL_SEC_START || secInMin > CONFIG.EVAL_SEC_END) return;
+
+            var bucket = CONFIG.EVAL_BUCKETS[0];
+
+            for (var bi=0; bi<CONFIG.EVAL_BUCKETS.length; bi++) if (secInMin >= CONFIG.EVAL_BUCKETS[bi]) bucket = CONFIG.EVAL_BUCKETS[bi];
+
+            if (lastEvalBucket[pairLabel] === block60+':'+bucket) return;
+
+            lastEvalBucket[pairLabel] = block60+':'+bucket;
+
+            evaluateAll(pairLabel, time, history[pairLabel].m1.concat([state.m1]), history[pairLabel].s15.concat([state.s15]), secInMin);
+
+        } catch (err) { console.error('[VIP processTick]', err); uiLog('ERR processTick'); }
+
+    }
+
+    setInterval(function() { var now=getAdjustedTime(); for(var p in pendingTrades) if(pendingTrades.hasOwnProperty(p)&&now>pendingTrades[p].entryTimestamp+15){ uiLog('🧹 Limpiando pendiente: '+formatPairDisplay(p)); delete pendingTrades[p]; } },3000);
+
+    // WebSocket
+
+    function extractTicks(obj) { if(obj==null) return; if(Array.isArray(obj)){ if(obj.length>=3&&typeof obj[0]==='string'&&typeof obj[1]==='number'&&typeof obj[2]==='number'){ processTick(obj[0],obj[1],obj[2]); return; } for(var i=0;i<obj.length;i++) extractTicks(obj[i]); return; } if(typeof obj!=='object') return; for(var key in obj){ if(!obj.hasOwnProperty(key)) continue; var val=obj[key]; if(val&&typeof val==='object'&&!Array.isArray(val)&&val.time!=null&&val.price!=null){ var t=Number(val.time),p=Number(val.price); if(isFinite(t)&&isFinite(p)) processTick(key,t,p); } else if(val&&typeof val==='object') extractTicks(val); } }
+
+    function tryParseText(msg){ if(typeof msg!=='string') return; var i=msg.search(/[\{\[]/); if(i===-1) return; try{ extractTicks(JSON.parse(msg.substring(i))); }catch(e){} }
+
+    function handleBinaryFrame(buf){ try{ var text=new TextDecoder('utf-8',{fatal:false}).decode(new Uint8Array(buf)),j=text.search(/[\{\[]/); if(j!==-1) try{ extractTicks(JSON.parse(text.substring(j))); }catch(e2){} }catch(e){} }
+
+    var OriginalWS = win.WebSocket;
+
+    win.WebSocket = function(url,protocols){ var ws=protocols!==undefined?new OriginalWS(url,protocols):new OriginalWS(url); ws.addEventListener('message',function(e){ var d=e.data; if(typeof d==='string'){ tryParseText(d); return; } if(typeof Blob!=='undefined'&&d instanceof Blob) d.arrayBuffer().then(handleBinaryFrame).catch(function(){}); else if(typeof ArrayBuffer!=='undefined'&&d instanceof ArrayBuffer) handleBinaryFrame(d); }); return ws; };
+
+    win.WebSocket.prototype = OriginalWS.prototype;
+
+    function startUiWhenReady() { if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',function(){ bootOnce(); ensurePanel(); }); else{ bootOnce(); ensurePanel(); } setTimeout(ensurePanel,1500); setTimeout(ensurePanel,4000); }
+
+    startUiWhenReady();
+
+})();
